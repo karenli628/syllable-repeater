@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:syllable_repeater_app/features/editor/editor_controller.dart';
 import 'package:syllable_repeater_app/features/import_analysis/analysis_controller.dart';
 import 'package:syllable_repeater_app/main.dart';
 import 'package:syllable_repeater_app/shared/infra/infra_analysis_runner.dart';
@@ -80,8 +81,12 @@ void main() {
     expect(container.read(appShellSelectedIndexProvider),
         AppSection.editor.sectionIndex);
     expect(find.text('音節校正'), findsOneWidget);
-    // 音節列表應顯示 11 列的 #1..#11 索引標籤（editor_screen.dart）
-    expect(find.text('#1'), findsOneWidget);
-    expect(find.text('#11'), findsOneWidget);
+    // EditorController 自 pipeline done 事件載入 11 音節（listen loadFrom）
+    await tester.pump();
+    final editorSyllables =
+        container.read(editorControllerProvider).syllables;
+    expect(editorSyllables.length, 11);
+    // UI SyllableChipsRow 應顯示音節文字（金標準句尾 `vel` 為 unique）
+    expect(find.text('vel'), findsOneWidget);
   }, timeout: const Timeout(Duration(minutes: 3)));
 }

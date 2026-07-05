@@ -3,6 +3,7 @@
 library;
 
 export 'src/analysis/analysis_pipeline_adapters.dart';
+export 'src/analysis/file_waveform_peaks_cache.dart';
 export 'src/alignment/cmudict_loader.dart';
 export 'src/clock_impl.dart';
 export 'src/db/app_database.dart';

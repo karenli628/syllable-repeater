@@ -1,142 +1,233 @@
 // AI-Generate
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/empty_state.dart';
+import '../../shared/error/error_messages.dart';
 import '../../shared/tokens.dart';
 import '../import_analysis/analysis_controller.dart';
+import 'editor_controller.dart';
+import 'widgets/waveform_canvas.dart';
 
-/// S1a 收尾用的編輯器最小殼：顯示分析結果摘要與音節列表。
-/// 真正的 CustomPaint 波形／邊界拖動歸 S1b（frontend-design 功能點 3）。
-class EditorScreen extends ConsumerWidget {
+/// 波形校正編輯器（frontend-design 功能點 3、REQ-02）。
+///
+/// 本輪（S1b）覆蓋：WaveformCanvas 波形＋邊界＋拖動、開區間驗證＋零交越吸附、
+/// ⌘Z undo、單音節試聽 stub（S2 renderStep 接入後恢復）。韻律疊圖屬 S4，
+/// 本輪 Non-scope。
+class EditorScreen extends ConsumerStatefulWidget {
   const EditorScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(analysisControllerProvider);
-    final result = state.result;
+  ConsumerState<EditorScreen> createState() => _EditorScreenState();
+}
 
-    if (result == null) {
+class _EditorScreenState extends ConsumerState<EditorScreen> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final isMeta = HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed;
+    if (isMeta && event.logicalKey == LogicalKeyboardKey.keyZ) {
+      ref.read(editorControllerProvider.notifier).undo();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(editorControllerProvider);
+    // 監聽錯誤→SnackBar 顯示後 clearError（AT-02-02/05 通用回饋）
+    ref.listen<EditorUiState>(editorControllerProvider, (previous, next) {
+      final err = next.error;
+      if (err != null && previous?.error != err) {
+        final msg = ErrorMessages.fromCode(err.code).message;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(msg)));
+        ref.read(editorControllerProvider.notifier).clearError();
+      }
+    });
+
+    if (state.syllables.isEmpty) {
       return const EmptyState(
         icon: Icons.tune_outlined,
         title: '尚無可校正的分析結果',
-        message: '請先在「匯入」完成一次分析，這裡會顯示音節列表與待校正提示。',
+        message: '請先在「匯入」完成一次分析，這裡會顯示波形＋音節邊界。',
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(AppTokens.spaceLg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Header(result: result),
-          const SizedBox(height: AppTokens.spaceLg),
-          Expanded(child: _SyllableList(result: result)),
-        ],
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKey,
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.spaceLg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Header(state: state),
+            const SizedBox(height: AppTokens.spaceMd),
+            _WaveformSection(state: state),
+            const SizedBox(height: AppTokens.spaceMd),
+            _SyllableChipsRow(state: state),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.result});
+class _Header extends ConsumerWidget {
+  const _Header({required this.state});
 
-  final AlignmentResult result;
+  final EditorUiState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final needsReviewCount =
+        state.syllables.where((s) => s.needsReview).length;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('音節校正', style: textTheme.headlineSmall),
+              const SizedBox(height: AppTokens.spaceXs),
+              Text(
+                '共 ${state.syllables.length} 個音節；needsReview $needsReviewCount 個。'
+                '${state.isDragging && state.draggingPreviewMs != null ? '　拖動中：${state.draggingPreviewMs} ms' : ''}'
+                '${state.lastSnappedMs != null && !state.isDragging ? '　已吸附至 ${state.lastSnappedMs} ms' : ''}',
+                style: textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+        TextButton.icon(
+          onPressed: state.canUndo
+              ? () => ref.read(editorControllerProvider.notifier).undo()
+              : null,
+          icon: const Icon(Icons.undo),
+          label: const Text('撤銷 (⌘Z)'),
+        ),
+      ],
+    );
+  }
+}
+
+class _WaveformSection extends ConsumerWidget {
+  const _WaveformSection({required this.state});
+
+  final EditorUiState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final analysis = ref.watch(analysisControllerProvider);
+    final peaks = analysis.latestEvent?.waveformPeaks ?? const <WaveformPeak>[];
+    final pcmDurationMs = analysis.latestEvent?.decodedPcm?.durationMs;
+    final syllableSpanMs = state.syllables.isEmpty
+        ? 0
+        : state.syllables.last.endMs;
+    final totalDurationMs =
+        pcmDurationMs ?? (syllableSpanMs > 0 ? syllableSpanMs : 0);
+
+    final controller = ref.read(editorControllerProvider.notifier);
+    final pcm = analysis.latestEvent?.decodedPcm;
+    return SizedBox(
+      height: 200,
+      width: double.infinity,
+      child: WaveformCanvas(
+        peaks: peaks,
+        syllables: state.syllables,
+        totalDurationMs: totalDurationMs,
+        draggingBoundaryIndex: state.draggingBoundaryIndex,
+        draggingPreviewMs: state.draggingPreviewMs,
+        onDragStart: controller.dragStart,
+        onDragUpdate: controller.dragUpdate,
+        onDragEnd: () => controller.dragEnd(pcm),
+      ),
+    );
+  }
+}
+
+class _SyllableChipsRow extends StatelessWidget {
+  const _SyllableChipsRow({required this.state});
+
+  final EditorUiState state;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: AppTokens.spaceSm,
+      runSpacing: AppTokens.spaceSm,
       children: [
-        Text('音節校正', style: textTheme.headlineSmall),
-        const SizedBox(height: AppTokens.spaceXs),
-        Text(
-          '共 ${result.syllables.length} 個音節；信心 ${(result.confidence * 100).round()}%。',
-          style: textTheme.bodyMedium,
-        ),
-        if (result.needsReview)
-          Padding(
-            padding: const EdgeInsets.only(top: AppTokens.spaceXs),
-            child: Text(
-              '有音節標為 needsReview（下列以警示色標示），S1b 波形拖動會在此上線。',
-              style: textTheme.bodySmall
-                  ?.copyWith(color: colorScheme.tertiary),
-            ),
+        for (final syllable in state.syllables)
+          _SyllableChip(
+            label: syllable.text,
+            needsReview: syllable.needsReview,
+            onTap: () {
+              // 試聽 stub：S2 PracticeEngine.renderStep 接入前只給提示。
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(const SnackBar(
+                  content: Text('單音節試聽將於 S2（PracticeEngine.renderStep）上線'),
+                ));
+            },
           ),
       ],
     );
   }
 }
 
-class _SyllableList extends StatelessWidget {
-  const _SyllableList({required this.result});
+class _SyllableChip extends StatelessWidget {
+  const _SyllableChip({
+    required this.label,
+    required this.needsReview,
+    required this.onTap,
+  });
 
-  final AlignmentResult result;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      itemBuilder: (context, index) {
-        final syllable = result.syllables[index];
-        return _SyllableRow(index: index, syllable: syllable);
-      },
-      separatorBuilder: (_, __) =>
-          const SizedBox(height: AppTokens.spaceXs),
-      itemCount: result.syllables.length,
-    );
-  }
-}
-
-class _SyllableRow extends StatelessWidget {
-  const _SyllableRow({required this.index, required this.syllable});
-
-  final int index;
-  final Syllable syllable;
+  final String label;
+  final bool needsReview;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final background = syllable.needsReview
-        ? AppTokens.needsReview.withValues(alpha: 0.2)
-        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.spaceMd,
-        vertical: AppTokens.spaceSm,
-      ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(AppTokens.radius),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 32,
-            child: Text('#${index + 1}',
-                style: Theme.of(context).textTheme.labelSmall),
-          ),
-          const SizedBox(width: AppTokens.spaceSm),
-          Expanded(
-            child: Text(syllable.text,
-                style: Theme.of(context).textTheme.titleMedium),
-          ),
-          Text(
-            '${syllable.startMs}–${syllable.endMs} ms',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          if (syllable.needsReview)
-            Padding(
-              padding: const EdgeInsets.only(left: AppTokens.spaceSm),
-              child: Text(
-                'needsReview',
-                style: TextStyle(color: colorScheme.tertiary),
-              ),
-            ),
-        ],
+    final background = needsReview
+        ? AppTokens.needsReview
+        : colorScheme.primaryContainer;
+    final foreground = needsReview
+        ? Colors.black
+        : colorScheme.onPrimaryContainer;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTokens.radius),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.spaceMd,
+          vertical: AppTokens.spaceSm,
+        ),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(AppTokens.radius),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(color: foreground, fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }

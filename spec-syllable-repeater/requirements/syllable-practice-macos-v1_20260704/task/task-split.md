@@ -67,10 +67,10 @@
   【`[可直接做]`｜Non-scope：不含 UI 進度顯示｜驗證：AT-01-04/05；介面 1 欄位表逐欄核對】
 - [x] 3.5 產出 waveform peaks 計算（供前端 CustomPainter 快取）
   【`[可直接做]`｜Non-scope：不做多解析度縮放版本｜驗證：編輯器渲染 ≥30fps 之資料前提（REQ-02 3.2.6）】
-- [ ] 3.6 實作 `updateSyllableBoundary`（開區間驗證＋`ERR_BOUNDARY_INVALID`；介面 2）
-  【`[可直接做]`｜Non-scope：undo 堆疊歸前端｜驗證：AT-02-02/05（越界拒絕、閉端拒絕）】
-- [ ] 3.7 實作零交越吸附（回傳 snappedMs；亦供 renderStep 收尾複用）
-  【`[可直接做]`｜Non-scope：不改變發音內容（§0.1 收尾限定）｜驗證：AT-02-01（吸附落點 ±10ms 內、接點無爆音）】
+- [x] 3.6 實作 `updateSyllableBoundary`（開區間驗證＋`ERR_BOUNDARY_INVALID`；介面 2）
+  【`[可直接做]`｜Non-scope：undo 堆疊歸前端｜驗證：AT-02-02/05（越界拒絕、閉端拒絕）；`packages/domain/test/alignment_boundary_test.dart` 7/7 全綠】
+- [x] 3.7 實作零交越吸附（回傳 snappedMs；亦供 renderStep 收尾複用）
+  【`[可直接做]`｜Non-scope：不改變發音內容（§0.1 收尾限定）｜驗證：AT-02-01（吸附落點 ±10ms 內、接點無爆音）；`packages/domain/lib/src/alignment/zero_crossing.dart` `findNearestZeroCrossingMs`，對稱窗常數 `kZeroCrossingSearchWindowMs=10`（供 4.4 renderStep 收尾共用）】
 - [ ] 3.8 實作 demucs.cpp 分離契約接入（失敗可跳過降級用原音；S1c）
   【`[需要回報]`（移植版選定，OQ-2）｜Non-scope：不內建進 domain（走 SidecarRunner）｜驗證：S1c demo——含背景音樂檔分離後邊界仍正確】
 
@@ -214,22 +214,25 @@
 
 ## 功能點 3：波形校正編輯器（editor）
 
-- [ ] **實作 WaveformCanvas（CustomPaint 波形＋邊界層）**
+- [x] **實作 WaveformCanvas（CustomPaint 波形＋邊界層）**
   - **File**: `app/lib/features/editor/widgets/waveform_canvas.dart`
   - **Work**: peaks 渲染；邊界線 hit-test 拖動手勢；RepaintBoundary 分層；needsReview 警示色
   - **Purpose**: REQ-02 核心互動面
+  - **進度註記（2026-07-06）**：peaks bar 渲染＋needsReview 灰底＋邊界線＋拖動預覽線；`onPanDown` hit-test ±12dp 命中最近邊界；RepaintBoundary 分層。實機 30fps 待 macOS 手動觀測（App Sandbox 已 waive 到 M9，見 memory `decision_macos_sandbox_ui_demo_waived_v1`）。
   - _Leverage: 3.5 peaks、tokens_｜_Requirements: REQ-02_
-  - 【`[可直接做]`｜Non-scope：不做縮放平移（v1 固定整句視圖）｜驗證：拖動 ≥30fps（REQ-02 3.2.6）】
-- [ ] **實作邊界校正流程（拖動→吸附→存回→undo）**
+  - 【`[可直接做]`｜Non-scope：不做縮放平移（v1 固定整句視圖）｜驗證：拖動 ≥30fps（REQ-02 3.2.6）；`app/test/editor/waveform_canvas_test.dart` 3/3 全綠】
+- [x] **實作邊界校正流程（拖動→吸附→存回→undo）**
   - **File**: `app/lib/features/editor/editor_controller.dart`
   - **Work**: onPanEnd 呼叫介面 2；`ERR_BOUNDARY_INVALID` 回彈動畫；⌘Z undo 堆疊；拖動中毫秒即時顯示；連續拖動取最終值
   - **Purpose**: 「拖一下就修好、改壞可回去」（REQ-02 動機/阻力點）
+  - **進度註記（2026-07-06）**：`EditorController` (Riverpod Notifier) 完成 dragStart/dragUpdate/dragEnd/undo/clearError；監聽 pipeline done 自動 loadFrom 初始化；`ERR_BOUNDARY_INVALID` 回彈原值＋SnackBar；⌘Z（macOS Meta）/^Z（其他）走 `Focus.onKeyEvent`。
   - _Leverage: 介面 2 欄位表_｜_Requirements: REQ-02_
-  - 【`[可直接做]`｜Non-scope：業務驗證不在 UI 重算（開區間規則歸 Domain）｜驗證：AT-02-01～05】
+  - 【`[可直接做]`｜Non-scope：業務驗證不在 UI 重算（開區間規則歸 Domain）｜驗證：AT-02-01～05；`app/test/editor/editor_controller_test.dart` 7/7 全綠】
 - [ ] **實作單音節試聽與韻律疊圖顯示**
   - **File**: `app/lib/features/editor/widgets/prosody_overlay.dart`
   - **Work**: 點音節→介面 4 試聽（≤200ms 啟動）；介面 7 疊圖（音高曲線/重音；pitchAvailable=false 顯示徽章）
   - **Purpose**: 校正即時驗證＋S4 視覺化
+  - **進度註記（2026-07-06）**：試聽 stub 已在 SyllableChipsRow 掛按鈕（點擊顯示「S2 接入」SnackBar）；真試聽依賴 S2 task 4.4 renderStep + 4.7 單音節 helper。韻律疊圖屬 S4，本輪 Non-scope。
   - _Leverage: 4.7 試聽輔助、介面 7 欄位表_｜_Requirements: REQ-02、REQ-05_
   - 【`[可直接做]`｜Non-scope：不做疊圖匯出圖片｜驗證：AT-05-01/02】
 

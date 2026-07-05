@@ -1,7 +1,21 @@
 // AI-Generate
+import '../errors.dart';
 import '../model/alignment_result.dart';
+import '../model/pcm.dart';
 import '../model/syllable.dart';
 import '../model/word.dart';
+import 'zero_crossing.dart';
+
+/// updateSyllableBoundary 回傳值（backend-design §3.2.1 介面 2）。
+class BoundaryUpdateResult {
+  final List<Syllable> syllables;
+  final int snappedMs;
+
+  const BoundaryUpdateResult({
+    required this.syllables,
+    required this.snappedMs,
+  });
+}
 
 /// CMUdict/規則音節查詢與等比例切分（task-split 3.1、3.3）。
 class AlignmentEngine {
@@ -36,6 +50,69 @@ class AlignmentEngine {
 
   int syllableCount(String word) =>
       dictionary.lookup(word)?.syllableCount ?? _fallbackSyllableCount(word);
+
+  /// 拖動邊界 [boundaryIndex]（分開 `current[i]` 與 `current[i+1]`）到
+  /// [newPositionMs]，做開區間驗證後以 [findNearestZeroCrossingMs] 吸附
+  /// 最近零交越（M1 允許的收尾處理，backend-design §3.2.1 介面 2）。
+  ///
+  /// 規則（requirement §3.2.7 AT-02-02/05）：
+  /// - 開區間：`current[i].startMs < newPositionMs < current[i+1].endMs`
+  /// - 違反 → `DomainException(ERR_BOUNDARY_INVALID)`，UI 端回彈原值
+  ///
+  /// 副作用（無）：純函式，回傳新 `List<Syllable>`＋吸附後 `snappedMs`；
+  /// 撤銷堆疊由 UI 端持有回傳值歷史（Domain 無狀態，見 backend-design §3.2.1）。
+  BoundaryUpdateResult updateSyllableBoundary({
+    required List<Syllable> current,
+    required int boundaryIndex,
+    required int newPositionMs,
+    required Pcm pcm,
+  }) {
+    if (boundaryIndex < 0 || boundaryIndex >= current.length - 1) {
+      throw ArgumentError(
+        'boundaryIndex 需介於 0..${current.length - 2}（got $boundaryIndex）',
+      );
+    }
+
+    final prev = current[boundaryIndex];
+    final next = current[boundaryIndex + 1];
+
+    if (newPositionMs <= prev.startMs || newPositionMs >= next.endMs) {
+      throw DomainException(
+        ErrorCodes.boundaryInvalid,
+        '邊界不可跨越相鄰音節（前起=${prev.startMs}ms、後止=${next.endMs}ms、目標=${newPositionMs}ms）',
+      );
+    }
+
+    final rawSnapped =
+        findNearestZeroCrossingMs(pcm, targetMs: newPositionMs);
+    // 開區間 clamp：吸附後仍須嚴守 prev.startMs < snapped < next.endMs
+    final snappedMs = rawSnapped
+        .clamp(prev.startMs + 1, next.endMs - 1);
+
+    final updated = <Syllable>[
+      for (var i = 0; i < current.length; i++)
+        if (i == boundaryIndex)
+          Syllable(
+            text: current[i].text,
+            startMs: current[i].startMs,
+            endMs: snappedMs,
+            wordIndex: current[i].wordIndex,
+            needsReview: false,
+          )
+        else if (i == boundaryIndex + 1)
+          Syllable(
+            text: current[i].text,
+            startMs: snappedMs,
+            endMs: current[i].endMs,
+            wordIndex: current[i].wordIndex,
+            needsReview: false,
+          )
+        else
+          current[i],
+    ];
+
+    return BoundaryUpdateResult(syllables: updated, snappedMs: snappedMs);
+  }
 
   List<Syllable> _splitWord(Word word, SyllableEntry plan) {
     final count = plan.syllableCount;

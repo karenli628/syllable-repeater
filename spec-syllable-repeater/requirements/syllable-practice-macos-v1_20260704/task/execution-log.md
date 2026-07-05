@@ -185,6 +185,45 @@
 - 失敗分類：無失敗
 - **結論：輕量門檻透過**。涵蓋任務：FP0（App 殼、shared/player 最小殼）、FP2（真 pipeline 注入、10 分鐘時長前置檢查、分階段 checkpoint 重試、done→editor 導向最小殼）、Domain `PipelineCheckpoint`／`analyze(resume:)`、Infra `FfprobeDurationProbe`。S1a 切片 code 面完成。
 
+## Task S1b（波形校正編輯器）— 2026-07-06
+
+### Task 3.6 updateSyllableBoundary（domain 介面 2）
+- **狀態**：Done
+- **產物**：`packages/domain/lib/src/alignment/alignment_engine.dart` 新增 `updateSyllableBoundary` + `BoundaryUpdateResult`；`packages/domain/test/alignment_boundary_test.dart`（8 情境）
+- **實作重點**：開區間驗證（`prev.startMs < newPositionMs < next.endMs`）→違反拋 `DomainException(ERR_BOUNDARY_INVALID)`；呼叫 3.7 zero-crossing 吸附後 clamp 回開區間；只重建被改邊界左右兩音節（needsReview=false），其餘保原 immutable syllable 實例
+- **驗證（AT-02-*）**：AT-02-02（越前一音節起點拒絕）、AT-02-05（等於後一音節 endMs 閉端拒絕）、AT-02-01（吸附 ±10ms 內、needsReview=false）、boundaryIndex 越界 ArgumentError；相鄰音節端點嚴格相接（M2 語意）
+
+### Task 3.7 零交越吸附
+- **狀態**：Done
+- **產物**：`packages/domain/lib/src/alignment/zero_crossing.dart`（`findNearestZeroCrossingMs` 純函式＋常數 `kZeroCrossingSearchWindowMs=10`）
+- **實作重點**：對稱搜尋 ≤±10ms（±441 sample @44.1kHz）；判定 `sample[i-1]` 與 `sample[i]` 變號或前為 0；找不到回原 targetMs（不吸附）；上下邊界 clamp 不 crash
+- **常數共用**：`kZeroCrossingSearchWindowMs` 亦供 S2 task 4.4 `renderStep` 端點 ≤10ms fade 收尾複用（backend-design §0.1 M1）
+
+### Task FP0/FP3 peaks 快取
+- **狀態**：Done
+- **產物**：`packages/domain/lib/src/ports/waveform_peaks_cache.dart`（port 抽象）；`packages/infra/lib/src/analysis/file_waveform_peaks_cache.dart`（走 `AtomicFileIo` 存 `<dir>/waveform-<key>.json`，schemaVersion=1）；`packages/infra/test/file_waveform_peaks_cache_test.dart`（5 情境）
+- **實作重點**：M5 domain 純度——port 在 domain、實作在 infra；key sanitize 只保 `[a-zA-Z0-9_-]`（避免斜線逃出目錄）；schemaVersion 不符/毀損檔一律當 miss，不擋 UI
+
+### Task FP3 前端（WaveformCanvas + EditorController + EditorScreen）
+- **狀態**：Done
+- **產物**：
+  - `app/lib/features/editor/editor_controller.dart`（Riverpod Notifier）
+  - `app/lib/features/editor/widgets/waveform_canvas.dart`（CustomPaint + RepaintBoundary）
+  - `app/lib/features/editor/editor_screen.dart`（改造：Focus.onKeyEvent 綁 ⌘/^Z undo；SnackBar 顯示 error；試聽 stub）
+  - `app/test/editor/editor_controller_test.dart`（7 情境）＋`app/test/editor/waveform_canvas_test.dart`（3 情境）
+- **實作重點**：
+  - `EditorController` 監聽 `analysisControllerProvider` done→`loadFrom(result.syllables)`；state 內 undoStack 為 `List<List<Syllable>>` 每筆為完整快照；`dragEnd(Pcm?)` 接受 nullable pcm（測試易注入 fake、無 pcm 時清拖動不動 syllables）
+  - `WaveformCanvas` `hitToleranceDp=12`；`onPanDown` 命中→onDragStart；`onPanUpdate` 依 `draggingBoundaryIndex` 為 non-null 才 fire；拖動預覽線用 `tertiary` 高亮突出
+  - `EditorScreen` `Focus + onKeyEvent` 綁 macOS ⌘Z / 其他 ^Z 走 undo；試聽 SyllableChip 點擊顯示「S2 接入」SnackBar
+- **驗證（AT-02-*）**：AT-02-01（吸附落點）、AT-02-02/05（回彈＋SnackBar）、AT-02-03（連續拖動只送最終值）、AT-02-04（undo 從堆疊 pop）；`e2e_pipeline_test.dart` 同步更新（改讀 editor controller state 驗 11 音節）
+
+## 輕量門檻紀錄（編譯階段）— S1b
+
+- 後端（純 Dart）：`flutter test packages/domain/test` **29/29 ✅**（+8：boundary 7 + zero-crossing 4；含既有 21）；`flutter test packages/infra/test` **44/44 ✅**（+5：peaks cache 5；1 skip 為既有 sidecar tag）
+- 前端：`flutter analyze` **No issues found** ✅ → `cd app && flutter test` **15/15 ✅**（+10：editor controller 7 + waveform canvas 3；含既有 5）
+- 失敗分類：無失敗（過程中兩處臨時 fail：①`file_waveform_peaks_cache_test` 局部變數命名 lint→改 `makeCache`；②`waveform_canvas_test` 邊界拖動 `onPanUpdate` 依 `draggingBoundaryIndex` 需 stateful host 模擬 controller wire up；③`e2e_pipeline_test` 舊斷言 `#1`/`#11` 為 EditorScreen 最小殼版標籤，本輪 chip 化改讀 controller state；均已修正）
+- **結論：輕量門檻透過**。涵蓋任務：3.6／3.7／FP3 三卡（WaveformCanvas＋邊界校正流程＋試聽 stub）；S1b 切片 code 面完成。
+
 ## e2e 驗收紀錄 — S1a Frontend FP2
 
 - **前置**：使用者裝完整 Xcode 15.4 + CocoaPods；`flutter build macos --debug` ✅（首次 pod install 成功，產物：`app/build/macos/Build/Products/Debug/syllable_repeater_app.app`）。
