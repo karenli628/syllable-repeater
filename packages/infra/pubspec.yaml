@@ -1,0 +1,24 @@
+# AI-Generate
+# 基礎設施轉接層：sidecar 執行器、檔案 IO、SQLite/Drift、（後續）secure storage 與 AI HTTP。
+# 依賴方向：infra → domain（單向，M5）。
+name: infra
+description: Syllable Repeater infrastructure adapters (sidecar, file IO, Drift/SQLite)
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  domain:
+    path: ../domain
+  drift: ^2.20.0
+  path: ^1.9.0
+  sqlite3: ^2.4.0
+
+dev_dependencies:
+  build_runner: ^2.4.0
+  drift_dev: ^2.20.0
+  lints: ^5.0.0
+  test: ^1.25.0

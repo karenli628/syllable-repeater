@@ -1,0 +1,16 @@
+# Dart / Flutter
+.dart_tool/
+build/
+pubspec.lock
+*.g.dart.tmp
+
+# 本機開發工具與大型模型（whisper.cpp / ggml-small.en 等）
+.local-tools/
+
+# macOS
+.DS_Store
+
+# 環境與金鑰（憲法 C6）
+.env
+*.pem
+*.p12

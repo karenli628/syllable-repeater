@@ -1,0 +1,39 @@
+#!/bin/sh
+# .githooks/pre-commit — Syllable Repeater 專用 Git pre-commit hook
+#
+# 安裝：`git config core.hooksPath .githooks`
+# 作用：每次 git commit 前自動檢查——不通過就擋下 commit。
+#
+# 檢查項目（本機開發速度優先）：
+#   1) 簡易金鑰掃描（項 11 Secret Scanning 之本機防線；正式 CI 應加 gitleaks）
+#   2) .env 誤送檢查（憲法 C6）
+#
+# 不放進 pre-commit 的：
+#   - 硬性限制 matrix check（skill 語意屬「交付前」→ 放在 pre-push；本 skill 5 條 REJECTED 未實作時會擋 push）
+#   - `flutter analyze` / `flutter test`（拖慢每次 commit，建議 pre-push 或 CI）
+
+set -e
+
+# 1) 簡易金鑰掃描（在 staged 檔案中找 api_key/secret/password/token 樣式）
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -n "$STAGED" ]; then
+    echo "[pre-commit] 掃描疑似金鑰..."
+    HIT=$(echo "$STAGED" | tr '\n' '\0' | xargs -0 grep -nEI \
+        "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][A-Za-z0-9_\\-]{16,}" \
+        2>/dev/null || true)
+    if [ -n "$HIT" ]; then
+        echo "[pre-commit] ❌ 疑似金鑰／密碼被提交，commit 被擋下："
+        echo "$HIT"
+        echo "[pre-commit] 請改用 Keychain（AI key）或 .env（並確認 .env 在 .gitignore 中）。"
+        exit 1
+    fi
+fi
+
+# 2) .env 誤送擋下（憲法 C6）
+if echo "$STAGED" | grep -qE "^\\.env$|/\\.env$"; then
+    echo "[pre-commit] ❌ 偵測到 .env 被 staged，commit 被擋下（憲法 C6 金鑰不進版控）。"
+    exit 1
+fi
+
+echo "[pre-commit] ✅ 檢查通過。"
+exit 0

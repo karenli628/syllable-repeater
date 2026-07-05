@@ -1,0 +1,38 @@
+#!/bin/sh
+# .githooks/pre-push — Syllable Repeater 專用 Git pre-push hook
+#
+# 安裝：`git config core.hooksPath .githooks`
+# 作用：推遠端前的「交付閘門」——不通過就擋 push。
+#
+# 檢查項目（skill hard-guardrails 鐵律 4：「適用但未實作即阻擋交付」）：
+#   1) 硬性限制 matrix 檢查（scripts/check_guardrails.py）
+#      - matrix 中不得有 NOT_REVIEWED
+#      - APPROVED_NOT_APPLICABLE 批准人必填且不得是 AI
+#      - REJECTED_NEEDS_IMPLEMENTATION 存在即擋（人類已拒絕，未實作前不得推遠端）
+#      - IMPLEMENTED 落地位置必填、PARTIAL 需備註風險
+#
+# 未來可再加：
+#   - flutter analyze
+#   - flutter test（domain purity + schema 結構斷言 + e2e 全綠）
+
+set -e
+
+MATRIX="spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/hard-limits-matrix.md"
+DECISION_LOG="spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/decision-log.md"
+
+if [ -f "scripts/check_guardrails.py" ]; then
+    echo "[pre-push] 檢查硬性限制 matrix..."
+    python3 scripts/check_guardrails.py "$MATRIX" "$DECISION_LOG" || {
+        echo "[pre-push] ❌ 硬性限制檢查未通過，push 被擋下（skill 鐵律 4）。"
+        echo "[pre-push]    若確需臨時推遠端，使用 --no-verify（不建議；違反 skill 精神）。"
+        exit 1
+    }
+elif [ -x "tools/guardrail-checker/target/release/guardrail-checker" ]; then
+    echo "[pre-push] 檢查硬性限制 matrix（Rust 版）..."
+    tools/guardrail-checker/target/release/guardrail-checker "$MATRIX" "$DECISION_LOG" || exit 1
+else
+    echo "[pre-push] ⚠️ 找不到 guardrail 檢查器，略過 matrix 檢查。"
+fi
+
+echo "[pre-push] ✅ 檢查通過。"
+exit 0

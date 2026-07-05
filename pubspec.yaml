@@ -1,0 +1,11 @@
+# AI-Generate
+# Syllable Repeater — Dart pub workspace 根（backend-design.md §1.5 儲存庫結構）
+# 成員：app（Flutter macOS UI）、packages/domain（純 Dart 領域層，M5）、packages/infra（sidecar/檔案 IO/DB 轉接層）
+name: syllable_repeater_workspace
+publish_to: none
+environment:
+  sdk: ^3.6.0
+workspace:
+  - app
+  - packages/domain
+  - packages/infra
