@@ -21,8 +21,21 @@ class InfraAnalysisRunner implements AnalysisRunner {
     Directory(paths.tempDirectory).createSync(recursive: true);
     const runner = SidecarRunner();
     final dictionary = const CmuDictLoader().load(paths.cmudictPath);
+    final decoder = FfmpegDecoder(runner: runner, ffmpegPath: paths.ffmpegPath);
+    // demucs 為選用（task-split 3.8 + memory `decision_hard_guardrails_matrix_20260705`）；
+    // 未就緒時 vocalSeparator 傳 null，pipeline 自動走「跳過分離用原音」降級
+    // （backend-design §5 第 704 行、M4）。
+    final vocalSeparator = paths.demucsAvailable()
+        ? DemucsCppVocalSeparator(
+            runner: runner,
+            decoder: decoder,
+            demucsCliPath: paths.demucsCliPath,
+            modelDir: paths.demucsModelDir,
+            outputDirectory: paths.tempDirectory,
+          )
+        : null;
     final pipeline = AnalysisPipeline(
-      decoder: FfmpegDecoder(runner: runner, ffmpegPath: paths.ffmpegPath),
+      decoder: decoder,
       transcriber: WhisperAnalysisTranscriber(
         audioPreparer: FfmpegTranscriptionAudioPreparer(
           runner: runner,
@@ -38,6 +51,7 @@ class InfraAnalysisRunner implements AnalysisRunner {
         outputDirectory: paths.tempDirectory,
       ),
       alignmentEngine: AlignmentEngine(dictionary: dictionary),
+      vocalSeparator: vocalSeparator,
     );
     return InfraAnalysisRunner._(pipeline);
   }

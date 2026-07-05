@@ -71,8 +71,12 @@
   【`[可直接做]`｜Non-scope：undo 堆疊歸前端｜驗證：AT-02-02/05（越界拒絕、閉端拒絕）；`packages/domain/test/alignment_boundary_test.dart` 7/7 全綠】
 - [x] 3.7 實作零交越吸附（回傳 snappedMs；亦供 renderStep 收尾複用）
   【`[可直接做]`｜Non-scope：不改變發音內容（§0.1 收尾限定）｜驗證：AT-02-01（吸附落點 ±10ms 內、接點無爆音）；`packages/domain/lib/src/alignment/zero_crossing.dart` `findNearestZeroCrossingMs`，對稱窗常數 `kZeroCrossingSearchWindowMs=10`（供 4.4 renderStep 收尾共用）】
-- [ ] 3.8 實作 demucs.cpp 分離契約接入（失敗可跳過降級用原音；S1c）
+- [x] 3.8 實作 demucs.cpp 分離契約接入（失敗可跳過降級用原音；S1c）
   【`[需要回報]`（移植版選定，OQ-2）｜Non-scope：不內建進 domain（走 SidecarRunner）｜驗證：S1c demo——含背景音樂檔分離後邊界仍正確】
+  【**OQ-2 定案（2026-07-06）**：sevagh/demucs.cpp（MIT License, Copyright 2023 Sevag H；主依賴 Eigen MPL-2.0）通過 M9 授權白名單；使用者透過 hard-guardrails skill 的 WebFetch 核對 LICENSE 檔實際內容】
+  【**產物**：`packages/infra/lib/src/sidecar/demucs_separator.dart` (`DemucsCppVocalSeparator implements AnalysisVocalSeparator`) ＋`test/demucs_separator_test.dart` 7 情境（含錯誤映射 + 成功路徑）＋`test/demucs_integration_test.dart` @Tags(['sidecar'])（skip if missing）＋app 端 `demucsReadyProvider` + UI 未就緒 tooltip 提示 3 情境測試】
+  【**依賴注入**：`app/lib/shared/infra/infra_analysis_runner.dart` 依 `paths.demucsAvailable()` 條件性注入 `vocalSeparator`；未就緒時 pipeline 走 `if (vocalSeparator != null)` null 分支自動降級（backend-design §5 第 704 行、M4）】
+  【**使用者本機事宜**（本輪 Non-scope）：demucs.cpp 二進位 build 與 htdemucs 模型下載——待使用者本機準備後真整合測試自動變綠。實際 CLI 語法若與 `--two-stems=vocals -o <dir> --model-dir <dir> <input>` 不符，改 `demucs_separator.dart` 內 args 常數即可】
 
 ## 4. PracticeEngine（介面 3–6；S2/S3；★TDD 先寫測試）
 
@@ -329,7 +333,7 @@
 ## 6. 開放問題與需人工確認
 
 - **OQ-1（已解決，2026-07-04）**：whisper.cpp 模型檔選型——使用者指定僅用 `small.en`。S1a 已下載 `ggml-small.en.bin` 至 `.local-tools/whisper.cpp/models/`；Intel Mac 上 mp3+Metal 初跑輸出異常，改以 FFmpeg 轉 16k mono WAV 並用 `--no-gpu`，對 `step up your coding skills to a new level` 辨識正確（約 3.48s）。
-- **OQ-2（承 BE §6-2）**：demucs.cpp 移植版選定，候選 [sevagh/demucs.cpp](https://github.com/sevagh/demucs.cpp)；**授權須在 S1c 動工前直接核對該 repo LICENSE 檔**（選型研究時未能自動確認條款是否落於白名單）。（影響：後端 3.8、2.1；S1c 前決定即可，不阻塞 S0–S2）
+- **OQ-2（已解決，2026-07-06）**：demucs.cpp 移植版選定＝[sevagh/demucs.cpp](https://github.com/sevagh/demucs.cpp)。**LICENSE 核對結果 = MIT License, Copyright (c) 2023 Sevag H**（透過 hard-guardrails skill 的 WebFetch 直接讀 https://raw.githubusercontent.com/sevagh/demucs.cpp/main/LICENSE），無 non-commercial 或 share-alike 條款；主依賴 Eigen 為 MPL-2.0（檔案級 copyleft，對主程式不傳染）——皆通過 M9 授權白名單。使用者本機 build 與模型下載屬環境準備事宜，adapter code + 假 runner 測試 + integration skip 模式已就位（S1c-2/3/4）；hard-limits-matrix #12 Dependency Scanning PARTIAL 進度補至 IMPLEMENTED（詳見 memory `decision_demucs_cpp_selected_mit_licence`）。
 - **OQ-3**：Drift schema V1（任務 1.2，依規標 `[必須確認]`）——新建本機 SQLite、無既有資料；**使用者核可本 task-split 即視為確認**，後續 schema 變更另行確認。
 - **OQ-4（已解決，2026-07-04）**：原「任務 9.2 簽章/notarization 需 Apple Developer 帳號」——使用者無該帳號，於免簽章＋略過 Gatekeeper／免費 Apple ID Personal Team ad-hoc／桌面版走 Flutter Web PWA／延後至取得帳號再付費申請，四個選項中選定**「免簽章＋略過 Gatekeeper」**。任務 9.2 已改為打包未簽章 build＋操作說明，不再依賴 Apple 帳號；正式簽章／notarization 延後至取得帳號後再評估（見 requirement.md v1.2 修訂歷史、backend-design.md §6 開放問題第 3 項）。
 

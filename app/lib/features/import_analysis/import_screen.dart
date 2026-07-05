@@ -236,7 +236,24 @@ class _ImportPanel extends StatelessWidget {
                   ? null
                   : (value) => onSeparateVocalsChanged(value ?? false),
             ),
-            const Expanded(child: Text('先做人聲分離')),
+            const Text('先做人聲分離'),
+            const SizedBox(width: AppTokens.spaceSm),
+            // demucs 未就緒＋使用者勾了 → 顯示降級提示（task-split 3.8 S1c-6）
+            Consumer(builder: (context, ref, _) {
+              final ready = ref.watch(demucsReadyProvider);
+              if (ready || !state.separateVocals) {
+                return const SizedBox.shrink();
+              }
+              return Tooltip(
+                message: 'demucs 未就緒；勾選仍會分析，但將降級使用原音（backend-design M4）',
+                child: Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
+              );
+            }),
+            const Spacer(),
             FilledButton.icon(
               onPressed: state.canStart ? onStart : null,
               icon: const Icon(Icons.play_arrow),

@@ -11,6 +11,11 @@ final analysisRunnerProvider = Provider<AnalysisRunner>(
 /// 仍由 pipeline 解碼後把關（見 FfmpegDecoder.maxDurationMs）。
 final audioDurationProbeProvider = Provider<AudioDurationProbe?>((ref) => null);
 
+/// demucs.cpp 二進位與模型是否就緒（task-split 3.8）；為 false 時使用者若勾
+/// separateVocals，UI 顯示「未就緒，將降級使用原音」提示。預設 false，由
+/// `main.dart` 覆寫；widget test 不覆寫時等同「未就緒」＝preview 環境的合理值。
+final demucsReadyProvider = Provider<bool>((ref) => false);
+
 final analysisControllerProvider =
     NotifierProvider<AnalysisController, AnalysisUiState>(
       AnalysisController.new,

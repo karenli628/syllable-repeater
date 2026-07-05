@@ -8,6 +8,7 @@ export 'src/alignment/cmudict_loader.dart';
 export 'src/clock_impl.dart';
 export 'src/db/app_database.dart';
 export 'src/file_io_impl.dart';
+export 'src/sidecar/demucs_separator.dart';
 export 'src/sidecar/ffmpeg_decoder.dart';
 export 'src/sidecar/ffprobe_duration.dart';
 export 'src/sidecar/sidecar_runner.dart';

@@ -217,6 +217,41 @@
   - `EditorScreen` `Focus + onKeyEvent` 綁 macOS ⌘Z / 其他 ^Z 走 undo；試聽 SyllableChip 點擊顯示「S2 接入」SnackBar
 - **驗證（AT-02-*）**：AT-02-01（吸附落點）、AT-02-02/05（回彈＋SnackBar）、AT-02-03（連續拖動只送最終值）、AT-02-04（undo 從堆疊 pop）；`e2e_pipeline_test.dart` 同步更新（改讀 editor controller state 驗 11 音節）
 
+## Task S1c（demucs.cpp 分離契約接入）— 2026-07-06
+
+### OQ-2 授權核對（M9 CT-09 前置，hard-guardrails matrix #12 進度）
+- **狀態**：Done
+- **結果**：sevagh/demucs.cpp = **MIT License, Copyright (c) 2023 Sevag H**（透過 WebFetch `https://raw.githubusercontent.com/sevagh/demucs.cpp/main/LICENSE`），無 non-commercial／share-alike 條款；主依賴 Eigen = **MPL-2.0**（檔案級 copyleft、不傳染主程式）；皆通過 M9 白名單。決策記入 memory `decision_demucs_cpp_selected_mit_licence`。
+
+### Task 3.8 domain 端 port（S1a 已就緒）＋infra adapter（本輪）
+- **狀態**：Done
+- **產物（新增）**：
+  - `packages/infra/lib/src/sidecar/demucs_separator.dart`（`DemucsCppVocalSeparator implements AnalysisVocalSeparator`）
+  - `packages/infra/test/demucs_separator_test.dart`（7 情境：exit≠0／kill -9／timeout／spawn／vocals.wav 未生成／成功 CLI+decoder 讀回／workDir sanitize）
+  - `packages/infra/test/demucs_integration_test.dart`（`@Tags(['sidecar'])`；缺 demucs 二進位/模型即 `markTestSkipped`）
+- **產物（修改）**：`packages/infra/lib/infra.dart`（export demucs_separator）
+
+### Task S1c-1/5 SidecarPaths 擴充＋條件性注入
+- **狀態**：Done
+- **產物（修改）**：
+  - `app/lib/shared/infra/sidecar_paths.dart`：加 `demucsCliPath`／`demucsModelDir`（env `DEMUCS_CLI_PATH`／`DEMUCS_MODEL_DIR` 覆寫，fallback `.local-tools/demucs.cpp/build/bin/demucs.cpp`／`.local-tools/demucs.cpp/ggml-model-htdemucs`）；`missingPaths()` 不納入 demucs；新增 `demucsAvailable()` bool
+  - `app/lib/shared/infra/infra_analysis_runner.dart`：`paths.demucsAvailable()` 條件性建 `DemucsCppVocalSeparator` 注入 pipeline；未就緒時 `vocalSeparator: null`，pipeline 內 `if (vocalSeparator != null)` 走 null 分支自動降級（backend-design §5 第 704 行、M4）
+  - `app/lib/main.dart`：新增 `demucsReadyProvider.overrideWithValue(paths.demucsAvailable())` 無條件覆寫（供 UI 讀）
+  - `app/lib/features/import_analysis/analysis_controller.dart`：新增 `demucsReadyProvider`（預設 false，widget test 無覆寫即等同「未就緒」）
+
+### Task S1c-6 UI「demucs 未就緒」提示
+- **狀態**：Done
+- **產物（修改）**：`app/lib/features/import_analysis/import_screen.dart`：`separateVocals` Row 內加 `Consumer(demucsReadyProvider)`——當就緒=false 且勾了 separateVocals 才顯示 `Icons.info_outline` + Tooltip「demucs 未就緒；勾選仍會分析，但將降級使用原音（backend-design M4）」
+- **產物（新增）**：`app/test/features/import_analysis/import_screen_demucs_hint_test.dart`（3 情境：ready → 勾了不顯示／未 ready + 未勾不顯示／未 ready + 勾了顯示 tooltip 且訊息含「demucs 未就緒」）
+
+## 輕量門檻紀錄（編譯階段）— S1c
+
+- 後端（純 Dart）：`flutter test packages/domain/test` **29/29 ✅**（既有；本輪未動 domain）；`flutter test packages/infra/test` **51/51 ✅**（+7 demucs adapter；1 skip 既有 sidecar + 1 skip demucs integration 未安裝）
+- 前端：`flutter analyze` **No issues found** ✅ → `cd app && flutter test` **18/18 ✅**（+3 demucs hint）
+- 分析修正：①`fake` closure 內部引用同名 `final` 變數 → 改 `late _FakeRunner fake` 兩步宣告；②widget test `pumpAndSettle` 撞 Checkbox splash animation timeout → 改 `pump() + pump(300ms)`；③unused import
+- 失敗分類：無失敗
+- **結論：輕量門檻透過**。涵蓋任務：3.8（demucs 契約接入）＋SidecarPaths 擴充＋UI 未就緒提示；demucs.cpp 真整合測試待使用者本機 build＋htdemucs 模型下載後自動變綠。
+
 ## 輕量門檻紀錄（編譯階段）— S1b
 
 - 後端（純 Dart）：`flutter test packages/domain/test` **29/29 ✅**（+8：boundary 7 + zero-crossing 4；含既有 21）；`flutter test packages/infra/test` **44/44 ✅**（+5：peaks cache 5；1 skip 為既有 sidecar tag）

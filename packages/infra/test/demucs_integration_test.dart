@@ -1,0 +1,97 @@
+// AI-Generate
+@Tags(['sidecar'])
+library;
+
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:domain/domain.dart';
+import 'package:infra/infra.dart';
+import 'package:path/path.dart' as p;
+import 'package:test/test.dart';
+
+/// S1c 真整合測試（task-split 3.8）：`.local-tools/demucs.cpp/` 就緒時對使用者
+/// mp3 跑真 demucs.cpp CLI + FFmpeg 讀回 vocals PCM；缺失即 skip。
+///
+/// **首次跑通後**：若 sevagh/demucs.cpp CLI 語法與 `demucs_separator.dart` 內
+/// `args` 常數不符，改該處常數即可（backend-design §3.2.1 契約推測；本測試
+/// 是使用者本機首次驗證的地方）。
+void main() {
+  test('S1c demo：真 demucs.cpp 分離出 vocals.wav → 解碼回 PCM 非空', () async {
+    final root = Directory.current.parent.parent;
+    final ffmpeg = _firstExisting([
+      '/usr/local/bin/ffmpeg',
+      '/opt/homebrew/bin/ffmpeg',
+    ]);
+    final demucsCli = File(p.join(
+      root.path,
+      '.local-tools/demucs.cpp/build/bin/demucs.cpp',
+    ));
+    final modelDir = Directory(p.join(
+      root.path,
+      '.local-tools/demucs.cpp/ggml-model-htdemucs',
+    ));
+    final audio = File(p.join(
+      root.path,
+      'step up your coding skills to a new level.mp3',
+    ));
+
+    if (ffmpeg == null) {
+      markTestSkipped('FFmpeg not installed');
+      return;
+    }
+    if (!demucsCli.existsSync()) {
+      markTestSkipped('demucs.cpp local build not installed (S1c 使用者本機事宜)');
+      return;
+    }
+    if (!modelDir.existsSync()) {
+      markTestSkipped('demucs.cpp htdemucs model not installed');
+      return;
+    }
+    if (!audio.existsSync()) {
+      markTestSkipped('user audio file not found');
+      return;
+    }
+
+    final workRoot = Directory(p.join(
+      root.path,
+      '.local-tools/s1c/demucs_integration',
+    ));
+    workRoot.createSync(recursive: true);
+
+    const runner = SidecarRunner(defaultTimeout: Duration(seconds: 240));
+    final separator = DemucsCppVocalSeparator(
+      runner: runner,
+      decoder: FfmpegDecoder(runner: runner, ffmpegPath: ffmpeg.path),
+      demucsCliPath: demucsCli.path,
+      modelDir: modelDir.path,
+      outputDirectory: workRoot.path,
+    );
+
+    final request = ImportRequest(
+      audioPath: audio.path,
+      separateVocals: true,
+    );
+    final decodedPcm = Pcm(await _emptyInt16List(),
+        sampleRate: 44100); // pipeline 實際 decodedPcm 不影響 demucs（demucs 用 audioPath）
+
+    final result = await separator.separate(request, decodedPcm: decodedPcm);
+
+    expect(result.audioPath, endsWith('vocals.wav'));
+    expect(File(result.audioPath).existsSync(), isTrue);
+    expect(result.pcm.samples, isNotEmpty);
+    expect(result.pcm.sampleRate, 44100);
+    expect(result.pcm.durationMs, greaterThan(1000),
+        reason: '3 秒級音檔分離後應仍有數秒 vocals');
+  });
+}
+
+File? _firstExisting(List<String> paths) {
+  for (final p in paths) {
+    final f = File(p);
+    if (f.existsSync()) return f;
+  }
+  return null;
+}
+
+Future<Int16List> _emptyInt16List() async => Int16List(0);

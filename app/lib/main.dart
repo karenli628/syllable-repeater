@@ -12,7 +12,11 @@ import 'shell/app_shell.dart';
 
 void main() {
   final paths = SidecarPaths.dev();
-  final overrides = <Override>[];
+  final overrides = <Override>[
+    // demucs 為選用（task-split 3.8）；未就緒時 pipeline 走「跳過分離降級」，
+    // 但 UI 端要能顯示「未就緒，將降級使用原音」提示，故在此無條件覆寫。
+    demucsReadyProvider.overrideWithValue(paths.demucsAvailable()),
+  ];
   if (paths.missingPaths().isEmpty) {
     overrides
       ..add(
