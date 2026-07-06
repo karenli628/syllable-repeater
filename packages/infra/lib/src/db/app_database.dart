@@ -1,5 +1,6 @@
 // AI-Generate
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 
 part 'app_database.g.dart';
 
@@ -21,7 +22,8 @@ class LessonRegistry extends Table {
 
 /// 練習分組：進度/SRS 結算最小單位（限單一 Lesson 內）。
 /// M7 結構防線：本表**沒有**任何逾期/失敗/懲罰欄位。
-@TableIndex(name: 'idx_pg_sync_key', columns: {#profileId, #courseId, #lessonId})
+@TableIndex(
+    name: 'idx_pg_sync_key', columns: {#profileId, #courseId, #lessonId})
 @TableIndex(name: 'idx_pg_status', columns: {#status})
 class PracticeGroups extends Table {
   @override
@@ -94,12 +96,50 @@ class AppSettings extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
+/// #22 Audit Log：本機自審用設定/狀態操作紀錄，非 immutable 稽核級。
+/// M10/C6 結構防線：不存 API key、音訊 bytes、錄音路徑或檔案路徑。
+@TableIndex(name: 'idx_audit_log_time', columns: {#occurredAt})
+@TableIndex(name: 'idx_audit_log_action', columns: {#action})
+class AuditLogs extends Table {
+  @override
+  String get tableName => 'audit_log';
+
+  TextColumn get id => text()();
+  IntColumn get occurredAt => integer()();
+  TextColumn get actor => text()();
+  TextColumn get action => text()();
+  TextColumn get targetType => text()();
+  TextColumn get targetId => text().nullable()();
+  TextColumn get metadataJson => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DriftDatabase(
-  tables: [LessonRegistry, PracticeGroups, SrsStates, Attempts, AppSettings],
+  tables: [
+    LessonRegistry,
+    PracticeGroups,
+    SrsStates,
+    Attempts,
+    AppSettings,
+    AuditLogs,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(auditLogs);
+          }
+        },
+      );
 }
+
+AppDatabase createInMemoryAppDatabase() => AppDatabase(NativeDatabase.memory());

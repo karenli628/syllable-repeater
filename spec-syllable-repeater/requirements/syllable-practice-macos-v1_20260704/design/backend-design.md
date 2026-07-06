@@ -209,7 +209,7 @@ CREATE TABLE attempt (
 CREATE INDEX idx_attempt_group ON attempt(group_id, created_at);
 
 CREATE TABLE app_settings (
-    key TEXT PRIMARY KEY,                -- 如 reminder.minutes / reminder.failCap / reminder.dailyCount
+    key TEXT PRIMARY KEY,                -- 如 reminder.minutes / reminder.failCap / reminder.dailySessions
     value TEXT NOT NULL
 );
 ```
@@ -217,7 +217,18 @@ CREATE TABLE app_settings (
 **修改腳本**：`packages/infra/lib/db/schema/V2__alter_placeholder.sql`
 
 ```sql
--- TODO：後續變更佔位（目前無變更）
+-- V2：#22 Audit Log（使用者 2026-07-06 核准）
+CREATE TABLE IF NOT EXISTS audit_log (
+    id TEXT PRIMARY KEY,
+    occurred_at INTEGER NOT NULL,         -- epoch ms（UTC）
+    actor TEXT NOT NULL,                  -- local-user / system
+    action TEXT NOT NULL,                 -- reminder_config_changed 等
+    target_type TEXT NOT NULL,
+    target_id TEXT,
+    metadata_json TEXT NOT NULL           -- 僅存非敏感摘要，禁止 key/audio/path
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
 ```
 
 #### 表關係圖

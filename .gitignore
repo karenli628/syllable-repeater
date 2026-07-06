@@ -1,6 +1,8 @@
 # Dart / Flutter
 .dart_tool/
 build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
 pubspec.lock
 *.g.dart.tmp
 
@@ -10,7 +12,23 @@ pubspec.lock
 # macOS
 .DS_Store
 
+# IDE / agent local state
+.idea/
+*.iml
+.claude/
+.agents/
+
+# JavaScript dependencies
+node_modules/
+
+# Python local environments and caches
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+
 # 環境與金鑰（憲法 C6）
 .env
+.env.*
 *.pem
 *.p12

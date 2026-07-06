@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "allowedLicenses": [
+      "MIT",
+      "BSD-2-Clause",
+      "BSD-3-Clause",
+      "BSD-like",
+      "ISC",
+      "Apache-2.0",
+      "LGPL-2.1-or-later",
+      "LGPL-3.0-or-later",
+      "MPL-2.0"
+    ],
+    "banned": [
+      "GPL",
+      "AGPL",
+      "CC BY-NC",
+      "non-commercial",
+      "research-only",
+      "bundled Python runtime"
+    ]
+  },
+  "components": [
+    {
+      "name": "Dart SDK",
+      "category": "toolchain",
+      "license": "BSD-3-Clause",
+      "distribution": "dev-only",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "https://github.com/dart-lang/sdk"
+    },
+    {
+      "name": "Flutter SDK",
+      "category": "toolchain",
+      "license": "BSD-3-Clause",
+      "distribution": "dev-only",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "https://github.com/flutter/flutter"
+    },
+    {
+      "name": "archive",
+      "category": "dart-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/archive"
+    },
+    {
+      "name": "crypto",
+      "category": "dart-package",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/crypto"
+    },
+    {
+      "name": "drift",
+      "category": "dart-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/drift"
+    },
+    {
+      "name": "sqlite3",
+      "category": "dart-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart/C",
+      "linking": "n/a",
+      "source": "pub.dev/packages/sqlite3"
+    },
+    {
+      "name": "path",
+      "category": "dart-package",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/path"
+    },
+    {
+      "name": "cupertino_icons",
+      "category": "flutter-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/cupertino_icons"
+    },
+    {
+      "name": "flutter_riverpod",
+      "category": "flutter-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/flutter_riverpod"
+    },
+    {
+      "name": "desktop_drop",
+      "category": "flutter-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/desktop_drop"
+    },
+    {
+      "name": "file_selector",
+      "category": "flutter-package",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/file_selector"
+    },
+    {
+      "name": "just_audio",
+      "category": "flutter-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/just_audio"
+    },
+    {
+      "name": "record",
+      "category": "flutter-package",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/record"
+    },
+    {
+      "name": "FFmpeg release build",
+      "category": "sidecar",
+      "license": "LGPL-2.1-or-later",
+      "distribution": "bundled",
+      "language": "C/C++",
+      "linking": "dynamic",
+      "source": "https://ffmpeg.org/legal.html",
+      "notes": "Release build must be LGPL-only and dynamically linked; Homebrew GPL build is dev-only."
+    },
+    {
+      "name": "whisper.cpp",
+      "category": "sidecar",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "C/C++",
+      "linking": "n/a",
+      "source": "https://github.com/ggerganov/whisper.cpp"
+    },
+    {
+      "name": "demucs.cpp",
+      "category": "sidecar",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "C/C++",
+      "linking": "n/a",
+      "source": "https://github.com/sevagh/demucs.cpp"
+    },
+    {
+      "name": "Eigen",
+      "category": "sidecar-transitive",
+      "license": "MPL-2.0",
+      "distribution": "bundled",
+      "language": "C++",
+      "linking": "n/a",
+      "source": "https://gitlab.com/libeigen/eigen"
+    },
+    {
+      "name": "CMUdict",
+      "category": "data",
+      "license": "BSD-like",
+      "distribution": "bundled",
+      "language": "n/a",
+      "linking": "n/a",
+      "source": "http://www.speech.cs.cmu.edu/cgi-bin/cmudict"
+    }
+  ]
+}

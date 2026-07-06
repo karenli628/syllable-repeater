@@ -48,3 +48,5 @@ CREATE TABLE app_settings (
     key TEXT PRIMARY KEY,                -- 如 reminder.minutes / sidecar.timeoutSec
     value TEXT NOT NULL
 );
+
+-- V1 無 audit_log；#22 Audit Log 由 V2__alter_placeholder.sql 建立。

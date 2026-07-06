@@ -15,37 +15,42 @@ Pcm _flatPcm({int seconds = 3, int value = 100}) {
 }
 
 List<Syllable> _sample() => [
-      Syllable(
-          text: 'she',
-          startMs: 0,
-          endMs: 200,
-          wordIndex: 0,
-          needsReview: false),
-      Syllable(
-          text: 'has',
-          startMs: 200,
-          endMs: 400,
-          wordIndex: 1,
-          needsReview: false),
-      Syllable(
-          text: 'ex',
-          startMs: 400,
-          endMs: 600,
-          wordIndex: 2,
-          needsReview: true),
-      Syllable(
-          text: 'cel',
-          startMs: 600,
-          endMs: 800,
-          wordIndex: 2,
-          needsReview: true),
-      Syllable(
-          text: 'lent',
-          startMs: 800,
-          endMs: 1000,
-          wordIndex: 2,
-          needsReview: true),
-    ];
+  Syllable(
+    text: 'she',
+    startMs: 0,
+    endMs: 200,
+    wordIndex: 0,
+    needsReview: false,
+  ),
+  Syllable(
+    text: 'has',
+    startMs: 200,
+    endMs: 400,
+    wordIndex: 1,
+    needsReview: false,
+  ),
+  Syllable(
+    text: 'ex',
+    startMs: 400,
+    endMs: 600,
+    wordIndex: 2,
+    needsReview: true,
+  ),
+  Syllable(
+    text: 'cel',
+    startMs: 600,
+    endMs: 800,
+    wordIndex: 2,
+    needsReview: true,
+  ),
+  Syllable(
+    text: 'lent',
+    startMs: 800,
+    endMs: 1000,
+    wordIndex: 2,
+    needsReview: true,
+  ),
+];
 
 void main() {
   group('EditorController', () {
@@ -60,6 +65,40 @@ void main() {
       expect(state.syllables.length, 5);
       expect(state.undoStack, isEmpty);
       expect(state.canUndo, isFalse);
+      expect(state.prosody, isNull);
+    });
+
+    test('loadFrom 帶 PCM 時自動分析 prosody；pitch 抽不到不進 error', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final ctl = container.read(editorControllerProvider.notifier);
+      ctl.loadFrom(_sample(), pcm: Pcm(Int16List(44100 * 2)));
+
+      final state = container.read(editorControllerProvider);
+      expect(state.prosodyValue, isNotNull);
+      expect(state.prosodyValue!.rhythm, hasLength(5));
+      expect(state.prosodyValue!.pitchAvailable, isFalse);
+      expect(state.error, isNull);
+      expect(state.showProsodyOverlay, isTrue);
+    });
+
+    test('setProsodyOverlay 切換韻律疊圖顯示狀態', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final ctl = container.read(editorControllerProvider.notifier);
+      ctl.setProsodyOverlay(false);
+      expect(
+        container.read(editorControllerProvider).showProsodyOverlay,
+        isFalse,
+      );
+
+      ctl.setProsodyOverlay(true);
+      expect(
+        container.read(editorControllerProvider).showProsodyOverlay,
+        isTrue,
+      );
     });
 
     test('dragStart→dragUpdate→dragEnd 成功：syllables 更新、undoStack push、'
@@ -81,9 +120,10 @@ void main() {
       expect(state.syllables[2].needsReview, isFalse);
       expect(state.syllables[3].needsReview, isFalse);
       expect(state.lastSnappedMs, 700);
-      expect(state.undoStack, hasLength(1),
-          reason: '成功更新後 undoStack 記一筆原快照');
+      expect(state.undoStack, hasLength(1), reason: '成功更新後 undoStack 記一筆原快照');
       expect(state.error, isNull);
+      expect(state.prosodyValue, isNotNull);
+      expect(state.prosodyValue!.rhythm, hasLength(5));
     });
 
     test('dragEnd 遇 ERR_BOUNDARY_INVALID：syllables 回彈、error 曝光', () {
@@ -137,8 +177,7 @@ void main() {
       expect(container.read(editorControllerProvider).syllables[2].endMs, 700);
 
       ctl.undo();
-      final restored =
-          container.read(editorControllerProvider).syllables;
+      final restored = container.read(editorControllerProvider).syllables;
       expect(restored, equals(original));
       expect(container.read(editorControllerProvider).canUndo, isFalse);
       expect(container.read(editorControllerProvider).lastSnappedMs, isNull);

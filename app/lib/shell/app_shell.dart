@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/editor/editor_screen.dart';
 import '../features/import_analysis/import_screen.dart';
-import '../shared/empty_state.dart';
+import '../features/library/library_screen.dart';
+import '../features/practice/practice_screen.dart';
+import '../features/progress/progress_settings_screen.dart';
 import '../shared/navigation.dart';
 import '../shared/tokens.dart';
 
@@ -69,6 +71,11 @@ class AppShell extends ConsumerWidget {
                         selectedIcon: Icon(Icons.play_circle),
                         label: Text('練習'),
                       ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings),
+                        label: Text('設定'),
+                      ),
                     ],
                   ),
                   VerticalDivider(
@@ -80,18 +87,11 @@ class AppShell extends ConsumerWidget {
                     child: IndexedStack(
                       index: selectedIndex,
                       children: const [
-                        _PlaceholderScreen(
-                          icon: Icons.library_music_outlined,
-                          title: '課件庫',
-                          message: '完成匯入後，課件會從這裡進入練習與校正。',
-                        ),
+                        LibraryScreen(),
                         ImportScreen(),
                         EditorScreen(),
-                        _PlaceholderScreen(
-                          icon: Icons.play_circle_outline,
-                          title: '句尾疊加練習',
-                          message: 'S2 會在這裡播放 11 步原聲疊加練習。',
-                        ),
+                        PracticeScreen(),
+                        ProgressSettingsScreen(),
                       ],
                     ),
                   ),
@@ -102,22 +102,5 @@ class AppShell extends ConsumerWidget {
         ),
       ),
     );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return EmptyState(icon: icon, title: title, message: message);
   }
 }

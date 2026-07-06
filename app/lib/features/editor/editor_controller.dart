@@ -3,11 +3,17 @@ import 'package:domain/domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../import_analysis/analysis_controller.dart';
+import '../pack_translate/lesson_session_controller.dart';
 
 /// AlignmentEngine 注入點；預設 `AlignmentEngine()` 走內建 dictionary。
 /// 拖動流程只需 `updateSyllableBoundary`（純函式），不必掛真 CMUdict。
-final alignmentEngineProvider =
-    Provider<AlignmentEngine>((ref) => AlignmentEngine());
+final alignmentEngineProvider = Provider<AlignmentEngine>(
+  (ref) => AlignmentEngine(),
+);
+
+final prosodyAnalyzerProvider = Provider<ProsodyAnalyzer>(
+  (ref) => const ProsodyAnalyzer(),
+);
 
 final editorControllerProvider =
     NotifierProvider<EditorController, EditorUiState>(EditorController.new);
@@ -16,6 +22,9 @@ class EditorUiState {
   const EditorUiState({
     this.syllables = const [],
     this.undoStack = const [],
+    this.prosody,
+    this.showProsodyOverlay = true,
+    this.sourceLessonId,
     this.draggingBoundaryIndex,
     this.draggingPreviewMs,
     this.lastSnappedMs,
@@ -28,6 +37,14 @@ class EditorUiState {
 
   /// 每筆為一次成功邊界更新前的完整 syllables 快照；⌘Z 從尾端 pop。
   final List<List<Syllable>> undoStack;
+
+  /// REQ-05 韻律分析結果；pitch 抽不到是 data 狀態且 `pitchAvailable=false`。
+  final AsyncValue<Prosody>? prosody;
+
+  final bool showProsodyOverlay;
+
+  /// 由 `.abopack` hydrate 而來時記錄 lesson id；一般分析結果為 null。
+  final String? sourceLessonId;
 
   final int? draggingBoundaryIndex;
 
@@ -42,10 +59,14 @@ class EditorUiState {
 
   bool get isDragging => draggingBoundaryIndex != null;
   bool get canUndo => undoStack.isNotEmpty;
+  Prosody? get prosodyValue => prosody?.value;
 
   EditorUiState copyWith({
     List<Syllable>? syllables,
     List<List<Syllable>>? undoStack,
+    Object? prosody = _unset,
+    bool? showProsodyOverlay,
+    Object? sourceLessonId = _unset,
     Object? draggingBoundaryIndex = _unset,
     Object? draggingPreviewMs = _unset,
     Object? lastSnappedMs = _unset,
@@ -54,6 +75,13 @@ class EditorUiState {
     return EditorUiState(
       syllables: syllables ?? this.syllables,
       undoStack: undoStack ?? this.undoStack,
+      prosody: identical(prosody, _unset)
+          ? this.prosody
+          : prosody as AsyncValue<Prosody>?,
+      showProsodyOverlay: showProsodyOverlay ?? this.showProsodyOverlay,
+      sourceLessonId: identical(sourceLessonId, _unset)
+          ? this.sourceLessonId
+          : sourceLessonId as String?,
       draggingBoundaryIndex: identical(draggingBoundaryIndex, _unset)
           ? this.draggingBoundaryIndex
           : draggingBoundaryIndex as int?,
@@ -73,24 +101,85 @@ class EditorController extends Notifier<EditorUiState> {
   EditorUiState build() {
     // 監聽 analysis 完成→自動載入該次分析結果作為初始 syllables。
     ref.listen<AnalysisUiState>(analysisControllerProvider, (previous, next) {
-      final justFinished = previous?.status != AnalysisRunStatus.done &&
+      final justFinished =
+          previous?.status != AnalysisRunStatus.done &&
           next.status == AnalysisRunStatus.done;
       final result = next.result;
       if (justFinished && result != null) {
-        loadFrom(result.syllables);
+        loadFrom(result.syllables, pcm: next.latestEvent?.decodedPcm);
       }
     });
+    ref.listen<LessonSessionState>(lessonSessionControllerProvider, (
+      previous,
+      next,
+    ) {
+      final lesson = next.lesson;
+      final pcm = next.pcm;
+      if (lesson == null || pcm == null) {
+        return;
+      }
+      final previousLesson = previous?.lesson;
+      final sameLesson =
+          previousLesson?.id == lesson.id &&
+          previousLesson?.contentHash == lesson.contentHash &&
+          previousLesson?.updatedAt == lesson.updatedAt;
+      if (!sameLesson) {
+        loadLesson(lesson, pcm: pcm);
+      }
+    });
+    final session = ref.read(lessonSessionControllerProvider);
+    final lesson = session.lesson;
+    final pcm = session.pcm;
+    if (lesson != null && pcm != null) {
+      return _stateFromLesson(lesson, pcm);
+    }
+
+    final analysis = ref.read(analysisControllerProvider);
+    final result = analysis.result;
+    if (analysis.status == AnalysisRunStatus.done && result != null) {
+      return _stateFromAnalysis(
+        result.syllables,
+        analysis.latestEvent?.decodedPcm,
+      );
+    }
+
     return const EditorUiState();
   }
 
   /// 從 pipeline done 結果載入 syllables，重置 undoStack。
-  void loadFrom(List<Syllable> initial) {
-    state = EditorUiState(syllables: List.unmodifiable(initial));
+  void loadFrom(List<Syllable> initial, {Pcm? pcm}) {
+    state = _stateFromAnalysis(initial, pcm);
+  }
+
+  void loadLesson(Lesson lesson, {required Pcm pcm}) {
+    state = _stateFromLesson(lesson, pcm);
+  }
+
+  EditorUiState _stateFromAnalysis(List<Syllable> initial, Pcm? pcm) {
+    final syllables = List<Syllable>.unmodifiable(initial);
+    return EditorUiState(
+      syllables: syllables,
+      prosody: _analyzeProsody(pcm, syllables),
+    );
+  }
+
+  EditorUiState _stateFromLesson(Lesson lesson, Pcm pcm) {
+    final syllables = List<Syllable>.unmodifiable(lesson.syllables);
+    return EditorUiState(
+      syllables: syllables,
+      prosody: lesson.prosody == null
+          ? _analyzeProsody(pcm, syllables)
+          : AsyncValue.data(lesson.prosody!),
+      sourceLessonId: lesson.id,
+    );
+  }
+
+  void setProsodyOverlay(bool value) {
+    state = state.copyWith(showProsodyOverlay: value);
   }
 
   void dragStart(int boundaryIndex) {
-    if (boundaryIndex < 0 ||
-        boundaryIndex >= state.syllables.length - 1) {
+    if (boundaryIndex < 0 || boundaryIndex >= state.syllables.length - 1) {
       return;
     }
     state = state.copyWith(
@@ -131,9 +220,11 @@ class EditorController extends Notifier<EditorUiState> {
         newPositionMs: previewMs,
         pcm: pcm,
       );
+      final nextSyllables = List<Syllable>.unmodifiable(result.syllables);
       state = state.copyWith(
-        syllables: List.unmodifiable(result.syllables),
+        syllables: nextSyllables,
         undoStack: [...state.undoStack, state.syllables],
+        prosody: _analyzeProsody(pcm, nextSyllables),
         draggingBoundaryIndex: null,
         draggingPreviewMs: null,
         lastSnappedMs: result.snappedMs,
@@ -154,9 +245,14 @@ class EditorController extends Notifier<EditorUiState> {
     if (state.undoStack.isEmpty) return;
     final restored = state.undoStack.last;
     final rest = state.undoStack.sublist(0, state.undoStack.length - 1);
+    final session = ref.read(lessonSessionControllerProvider);
+    final pcm = state.sourceLessonId == session.lesson?.id
+        ? session.pcm
+        : ref.read(analysisControllerProvider).latestEvent?.decodedPcm;
     state = state.copyWith(
-      syllables: List.unmodifiable(restored),
+      syllables: List<Syllable>.unmodifiable(restored),
       undoStack: rest,
+      prosody: _analyzeProsody(pcm, restored),
       lastSnappedMs: null,
       error: null,
     );
@@ -165,5 +261,17 @@ class EditorController extends Notifier<EditorUiState> {
   void clearError() {
     if (state.error == null) return;
     state = state.copyWith(error: null);
+  }
+
+  AsyncValue<Prosody>? _analyzeProsody(Pcm? pcm, List<Syllable> syllables) {
+    if (pcm == null || syllables.isEmpty) {
+      return null;
+    }
+    try {
+      final prosody = ref.read(prosodyAnalyzerProvider).analyze(pcm, syllables);
+      return AsyncValue.data(prosody);
+    } catch (error, stackTrace) {
+      return AsyncValue.error(error, stackTrace);
+    }
   }
 }

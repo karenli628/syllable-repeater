@@ -5,25 +5,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:syllable_repeater_app/features/editor/widgets/waveform_canvas.dart';
 
 Widget _wrap(Widget child, {double width = 400}) => MaterialApp(
-      home: Scaffold(
-        body: Center(child: SizedBox(width: width, height: 180, child: child)),
-      ),
-    );
+  home: Scaffold(
+    body: Center(
+      child: SizedBox(width: width, height: 180, child: child),
+    ),
+  ),
+);
 
 List<Syllable> _twoSyllables() => [
-      Syllable(
-          text: 'a',
-          startMs: 0,
-          endMs: 500,
-          wordIndex: 0,
-          needsReview: false),
-      Syllable(
-          text: 'b',
-          startMs: 500,
-          endMs: 1000,
-          wordIndex: 1,
-          needsReview: true),
-    ];
+  Syllable(text: 'a', startMs: 0, endMs: 500, wordIndex: 0, needsReview: false),
+  Syllable(
+    text: 'b',
+    startMs: 500,
+    endMs: 1000,
+    wordIndex: 1,
+    needsReview: true,
+  ),
+];
 
 void main() {
   testWidgets('點在邊界 ±12dp 內 → onDragStart 被呼叫', (tester) async {
@@ -33,23 +31,27 @@ void main() {
 
     // WaveformCanvas 內 onPanUpdate 依 draggingBoundaryIndex 為 non-null 才 fire；
     // 用 StatefulBuilder 模擬 controller 收到 onDragStart 後把 index 塞回 prop。
-    await tester.pumpWidget(_wrap(StatefulBuilder(
-      builder: (context, setState) {
-        return WaveformCanvas(
-          peaks: List.filled(10, WaveformPeak(-0.5, 0.5)),
-          syllables: _twoSyllables(),
-          totalDurationMs: 1000,
-          draggingBoundaryIndex: startedIndex,
-          draggingPreviewMs: updatedMs,
-          onDragStart: (i) => setState(() => startedIndex = i),
-          onDragUpdate: (ms) => setState(() => updatedMs = ms),
-          onDragEnd: () => setState(() {
-            ended++;
-            startedIndex = null;
-          }),
-        );
-      },
-    )));
+    await tester.pumpWidget(
+      _wrap(
+        StatefulBuilder(
+          builder: (context, setState) {
+            return WaveformCanvas(
+              peaks: List.filled(10, WaveformPeak(-0.5, 0.5)),
+              syllables: _twoSyllables(),
+              totalDurationMs: 1000,
+              draggingBoundaryIndex: startedIndex,
+              draggingPreviewMs: updatedMs,
+              onDragStart: (i) => setState(() => startedIndex = i),
+              onDragUpdate: (ms) => setState(() => updatedMs = ms),
+              onDragEnd: () => setState(() {
+                ended++;
+                startedIndex = null;
+              }),
+            );
+          },
+        ),
+      ),
+    );
 
     // 邊界（endMs=500）→ 200dp（500/1000 * 400）
     final canvas = find.byType(WaveformCanvas);
@@ -78,20 +80,26 @@ void main() {
   testWidgets('點在邊界外 > 12dp → 不觸發 onDragStart', (tester) async {
     int? startedIndex;
 
-    await tester.pumpWidget(_wrap(WaveformCanvas(
-      peaks: const [],
-      syllables: _twoSyllables(),
-      totalDurationMs: 1000,
-      draggingBoundaryIndex: null,
-      draggingPreviewMs: null,
-      onDragStart: (i) => startedIndex = i,
-      onDragUpdate: (_) {},
-      onDragEnd: () {},
-    )));
+    await tester.pumpWidget(
+      _wrap(
+        WaveformCanvas(
+          peaks: const [],
+          syllables: _twoSyllables(),
+          totalDurationMs: 1000,
+          draggingBoundaryIndex: null,
+          draggingPreviewMs: null,
+          onDragStart: (i) => startedIndex = i,
+          onDragUpdate: (_) {},
+          onDragEnd: () {},
+        ),
+      ),
+    );
 
     final canvasRect = tester.getRect(find.byType(WaveformCanvas));
-    final farFromBoundary =
-        Offset(canvasRect.left + 100, canvasRect.center.dy); // 距 200 有 100dp
+    final farFromBoundary = Offset(
+      canvasRect.left + 100,
+      canvasRect.center.dy,
+    ); // 距 200 有 100dp
     final gesture = await tester.startGesture(farFromBoundary);
     await tester.pump();
 
@@ -100,16 +108,46 @@ void main() {
   });
 
   testWidgets('渲染不 crash（peaks 空、totalDurationMs=0）', (tester) async {
-    await tester.pumpWidget(_wrap(WaveformCanvas(
-      peaks: const [],
-      syllables: const [],
-      totalDurationMs: 0,
-      draggingBoundaryIndex: null,
-      draggingPreviewMs: null,
-      onDragStart: (_) {},
-      onDragUpdate: (_) {},
-      onDragEnd: () {},
-    )));
+    await tester.pumpWidget(
+      _wrap(
+        WaveformCanvas(
+          peaks: const [],
+          syllables: const [],
+          totalDurationMs: 0,
+          draggingBoundaryIndex: null,
+          draggingPreviewMs: null,
+          onDragStart: (_) {},
+          onDragUpdate: (_) {},
+          onDragEnd: () {},
+        ),
+      ),
+    );
+
+    expect(find.byType(WaveformCanvas), findsOneWidget);
+  });
+
+  testWidgets('韻律疊圖渲染不 crash（pitch/stress/NaN 音節）', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        WaveformCanvas(
+          peaks: List.filled(12, WaveformPeak(-0.4, 0.5)),
+          syllables: _twoSyllables(),
+          totalDurationMs: 1000,
+          draggingBoundaryIndex: null,
+          draggingPreviewMs: null,
+          prosody: Prosody(
+            rhythm: const [1, double.nan],
+            intensity: const [0.2, 0.0, 0.3],
+            stress: const [0.8, double.nan],
+            pitchContour: const [180, 190, 190, 185],
+            pitchAvailable: true,
+          ),
+          onDragStart: (_) {},
+          onDragUpdate: (_) {},
+          onDragEnd: () {},
+        ),
+      ),
+    );
 
     expect(find.byType(WaveformCanvas), findsOneWidget);
   });

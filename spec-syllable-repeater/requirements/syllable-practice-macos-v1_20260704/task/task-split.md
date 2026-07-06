@@ -80,49 +80,61 @@
 
 ## 4. PracticeEngine（介面 3–6；S2/S3；★TDD 先寫測試）
 
-- [ ] 4.1 【TDD-red】先寫 buildSteps 測試：金標準句 11 音節→**11 步**、第 2 步＝`tion skills`（不吸附）、5 音節句→5 步、repeatN 0/11 拒絕
+- [x] 4.1 【TDD-red】先寫 buildSteps 測試：金標準句 11 音節→**11 步**、第 2 步＝`tion skills`（不吸附）、5 音節句→5 步、repeatN 0/11 拒絕
   【`[可直接做]`｜Non-scope：不寫實作｜驗證：CT-02、AT-03-01/03/07/04（測試先紅）】
-- [ ] 4.2 實作 buildSteps（純函式：句尾倒數疊加、sourceRanges 僅存 TimeRange、totalDurationMs＝片段長×repeatN）
+- [x] 4.2 實作 buildSteps（純函式：句尾倒數疊加、sourceRanges 僅存 TimeRange、totalDurationMs＝片段長×repeatN）
   【`[可直接做]`｜Non-scope：不做單字邊界吸附（不可接受清單）｜驗證：4.1 測試轉綠】
-- [ ] 4.3 【TDD-red】先寫 renderStep §0.1 回歸測試：輸出與原 PCM 對應區間**逐 sample 相等**（端點 ≤10ms fade 除外）
+- [x] 4.3 【TDD-red】先寫 renderStep §0.1 回歸測試：輸出與原 PCM 對應區間**逐 sample 相等**（端點 ≤10ms fade 除外）
   【`[可直接做]`｜Non-scope：無｜驗證：**CT-01、AT-03-02**（本專案最高防線測試）】
-- [ ] 4.4 實作 renderStep（唯一路徑：copy sourceRanges→串接→零交越/micro-fade 收尾；複用 3.7）
+- [x] 4.4 實作 renderStep（唯一路徑：copy sourceRanges→串接→零交越/micro-fade 收尾；複用 3.7）
   【`[可直接做]`｜Non-scope：**禁止任何生成/合成路徑（M1）**｜驗證：4.3 測試轉綠＋CI 常駐】
-- [ ] 4.5 【TDD-red】先寫匯出靜音規則測試：`thank you very much` N=3→靜音 1.2s/1.8s…（解碼實測 ±20ms）；單步合併無尾端靜音
+- [x] 4.5 【TDD-red】先寫匯出靜音規則測試：`thank you very much` N=3→靜音 1.2s/1.8s…（解碼實測 ±20ms）；單步合併無尾端靜音
   【`[可直接做]`｜Non-scope：無｜驗證：CT-03、AT-04-02/03/06】
-- [ ] 4.6 實作 exportStep／exportMerged（sample 數插靜音、FFmpeg mp3 編碼、temp→原子搬移、回傳 silenceGapsMs、重入鎖）
+- [x] 4.6 實作 exportStep／exportMerged（sample 數插靜音、FFmpeg mp3 編碼、temp→原子搬移、回傳 silenceGapsMs、重入鎖）
   【`[可直接做]`｜Non-scope：不做 mp3 以外格式（允許變動，留擴充）｜驗證：4.5 測試轉綠；AT-04-01/04/05】
-- [ ] 4.7 單音節試聽支援（單音節 PracticeStep 建構輔助，供前端編輯器試聽走 renderStep）
+- [x] 4.7 單音節試聽支援（單音節 PracticeStep 建構輔助，供前端編輯器試聽走 renderStep）
   【`[可直接做]`｜Non-scope：無｜驗證：試聽輸出同樣通過逐 sample 斷言（M1 貫穿）】
 
 ## 5. ProsodyAnalyzer（介面 7；S4）
 
-- [ ] 5.1 實作 rhythm（音節時長比例）＋intensity（RMS 曲線）＋停頓偵測＋stress（能量×時長加權）
+- [x] 5.1 實作 rhythm（音節時長比例）＋intensity（RMS 曲線）＋停頓偵測＋stress（能量×時長加權）
   【`[可直接做]`｜Non-scope：只讀不寫音訊（§0.1）｜驗證：AT-05-01（11 個比例值）、AT-05-04（原檔 hash 不變）】
-- [ ] 5.2 實作 YIN pitch 抽取＋降級（抽不到→pitchAvailable=false，其餘照常；演算法封裝可換 WORLD）
+  - **進度註記（2026-07-06）**：`ProsodyAnalyzer.analyze` 已輸出 rhythm/intensity/stress；停頓偵測依 backend-design 介面 7 不擴張欄位，落在 `intensity[]` 低能量窗並以測試鎖住。AT-05-04 以 PCM sample 前後不變驗證只讀。
+- [x] 5.2 實作 YIN pitch 抽取＋降級（抽不到→pitchAvailable=false，其餘照常；演算法封裝可換 WORLD）
   【`[可直接做]`｜Non-scope：不實作 WORLD（v1.5）、不做 CREPE｜驗證：AT-05-02（耳語降級不失敗）、AT-05-03（0 長度音節跳過）】
+  - **進度註記（2026-07-06）**：已以 autocorrelation style pitch extraction 封裝於 `ProsodyAnalyzer` 內；零 PCM/氣音類情境降級為 `pitchAvailable=false`、`pitchContour=null`，rhythm/intensity/stress 照常。`Syllable` domain model 仍維持 `endMs > startMs` invariant，AT-05-03 以 sample index 換算後無有效樣本標 NaN 覆蓋 corrupted data 落點。
 
 ## 6. RecordingComparator（介面 8；S5；★TDD 先寫測試）
 
-- [ ] 6.1 【TDD-red】先寫比對測試：依 step 時間戳從整句原音切出正確基準片段；錄音 <0.2s 拒絕；**finally 刪錄音檔斷言**
+- [x] 6.1 【TDD-red】先寫比對測試：依 step 時間戳從整句原音切出正確基準片段；錄音 <0.2s 拒絕；**finally 刪錄音檔斷言**
   【`[可直接做]`｜Non-scope：無｜驗證：CT-10（刪檔）、AT-06-02】
-- [ ] 6.2 實作 DTW 對齊＋rhythmDelta/intonationDelta/overlayData（差異區段 TimeRange 列表）
+  - **進度註記（2026-07-06）**：已新增 `RecordingAudioSource` domain port、`ComparisonResult/OverlayData` 與 `RecordingComparator.compare`；錄音 <200ms 回 `ERR_RECORDING_TOO_SHORT`，decode 失敗也會進 `finally`，兩者皆斷言呼叫 `delete(userRecordingPath)`。Domain 不 import `dart:io`，刪檔副作用透過 port 交 infra 實作。
+- [x] 6.2 實作 DTW 對齊＋rhythmDelta/intonationDelta/overlayData（差異區段 TimeRange 列表）
   【`[可直接做]`｜Non-scope：不存任何錄音（M10）；score 為可選不強求｜驗證：6.1 測試轉綠；AT-06-01（10 秒錄音 ≤2s 出圖之效能斷言）】
+  - **進度註記（2026-07-06）**：`RecordingComparator` 以 RMS curve / pitch contour 做降採樣 DTW，產出 `rhythmDelta`、`intonationDelta`、雙波形/音高 overlay 與 `diffRanges`；10 秒錄音測試於 2 秒內完成。Infra `FileRecordingAudioSource` 支援 PCM 16-bit mono WAV decode，格式錯誤映射 `ERR_DECODE_FAILED`，delete 轉交 `FileIo`。
 
 ## 7. LessonPackEngine＋AIService＋ProgressEngine（介面 9–19；S6）
 
-- [ ] 7.1 實作 `.abopack` write/read（zip+JSON、schemaVersion=1、contentHash 重算、全檔驗證不部分載入、無絕對路徑/無 key）
+- [x] 7.1 實作 `.abopack` write/read（zip+JSON、schemaVersion=1、contentHash 重算、全檔驗證不部分載入、無絕對路徑/無 key）
   【`[可直接做]`｜Non-scope：不做授權/防盜欄位（Non-scope 4）｜驗證：AT-07-01（round-trip 位元級等價）、AT-07-03、AT-07-05（pack 無 key）】
+  - **進度註記（2026-07-06）**：已新增 `Lesson` / `Translation` / `PracticeConfig` 與 `LessonPackEngine`，使用純 Dart `archive` 寫 zip、`crypto` 算原音 bytes + syllables 的 contentHash。`write` 先重算 contentHash 並以 `FileIo.writeBytesAtomic` 寫入；pack 僅含 `manifest.json` 與 `audio/original.wav` 等相對路徑；`read` 先驗 `schemaVersion=1`、manifest、音訊 entry 與 contentHash，不合格一律 `ERR_PACK_CORRUPTED`，不部分載入。測試覆蓋 AT-07-01/03/05；`flutter test packages/domain/test` 54/54 綠，`flutter analyze` No issues。
 - [ ] 7.2 實作 AIService（SecureStore 介面走 Keychain、translate、manual 優先覆蓋規則、失敗不阻斷）
   【`[需要回報]`（外部服務商契約與 key 安全路徑須回報核對）｜Non-scope：**不得觸碰音訊（§0.1）**；不做金流｜驗證：AT-07-02/04/06、CT-10（key 不落地掃描）】
-- [ ] 7.3 實作 ProgressEngine 結算與 SRS（settle：間隔序列 [0,1,3,7,14,30]＋難度三檔；dueList：HARD 優先、無逾期概念）
+  - **進度註記（2026-07-06）**：已完成 Domain 可測部分：新增 `SecureStore` / `AiClient` ports、`AiProviderConfig` / `AiRateLimit` / request-response value types 與 `AIService.configure/translate/mergeTranslation`；未設 key 回 `ERR_AI_KEY_MISSING`、client 失敗包成 `ERR_AI_CALL_FAILED`、manual translation 永遠勝出。`AIService` 僅處理文字、不 import `http` / Flutter / `dart:io`，真 Keychain adapter 與真 provider HTTP adapter 仍待外部服務商契約與 key 安全路徑回報核對後再接。
+- [x] 7.3 實作 ProgressEngine 結算與 SRS（settle：間隔序列 [0,1,3,7,14,30]＋難度三檔；dueList：HARD 優先、無逾期概念）
   【`[可直接做]`｜Non-scope：schema 上不建任何失敗/逾期欄位（M7 結構防線）｜驗證：AT-08-01、CT-07/AT-08-02】
-- [ ] 7.4 實作進度匯入匯出（exportProgress／importProgress：全檔驗證→交易套用、updatedAt upsert、contentHash 只重置該 Lesson、MergeSummary）
+  - **進度註記（2026-07-06）**：已新增 `ProgressEngine.settle/dueList`、`ProgressRepository` port、`PracticeGroup` / `SrsState` / `DueGroup` / `Attempt` 等 Domain 型別；`packages/domain/test/progress_engine_test.dart` 覆蓋 AT-08-01、AT-08-02/CT-07 與 HARD priority。`dueList` 只查詢不寫狀態，跨日未練不記失敗/懲罰。
+- [x] 7.4 實作進度匯入匯出（exportProgress／importProgress：全檔驗證→交易套用、updatedAt upsert、contentHash 只重置該 Lesson、MergeSummary）
   【`[可直接做]`｜Non-scope：不做雲端同步（Non-scope 5）｜驗證：CT-06、AT-08-03/04/07】
-- [ ] 7.5 實作歸檔狀態機（ACTIVE→ARCHIVED→ACTIVE(<168h)/EXPIRED(≥168h 不可逆)；Clock 注入）
+  - **進度註記（2026-07-06）**：Domain 可測部分完成：新增 `ProgressSnapshot` / `MergeSummary`，`ProgressEngine.exportProgress/importProgress` 以 schemaVersion=1 JSON `.aboprogress` 透過 `FileIo` 原子寫入/讀取，先全檔驗證再合併，損毀檔回 `ERR_PROGRESS_CORRUPTED` 且不呼叫保存；`updatedAt` 較新覆寫、相等冪等、contentHash 變更只 reset 該 Lesson。`ProgressRepository.saveProgressSnapshot` 已明定 infra adapter 必須交易套用；真 Drift adapter / FP7 MergeSummary UI 尚待後續接線。
+  - **接續註記（2026-07-06）**：真 Drift adapter 已完成：`DriftProgressRepository.saveProgressSnapshot` 以 transaction 清舊表後套用 snapshot，保留既有 `lesson_registry.pack_path/title`，`packages/infra/test/drift_progress_repository_test.dart` 覆蓋交易保存；FP7 已接 `ProgressSettingsScreen` 的 `.aboprogress` file picker 與 MergeSummary 對話框，`app/test/progress/progress_ui_test.dart` 覆蓋匯出/匯入 UI。
+- [x] 7.5 實作歸檔狀態機（ACTIVE→ARCHIVED→ACTIVE(<168h)/EXPIRED(≥168h 不可逆)；Clock 注入）
   【`[可直接做]`｜Non-scope：無｜驗證：CT-08、AT-08-05/06（167h/169h 兩側）】
-- [ ] 7.6 實作 reminderConfig 三參數讀寫（預設 15/5/2，存 app_settings 非硬編碼）
+  - **進度註記（2026-07-06）**：Domain 可測部分完成：新增 `ProgressEngine.archive/restore` 與 `ProgressRepository.saveGroup` port。`archive` 只允許 ACTIVE→ARCHIVED 並寫 `archivedAt=clock.now()`；`restore` 以注入 Clock 判定 168h（不含），167h 內回 ACTIVE 並清 `archivedAt`，169h 後惰性轉 EXPIRED 並拋 `ERR_ARCHIVE_RESTORE_EXPIRED`；ARCHIVED/EXPIRED 不進 `dueList` 且 `dueList` 不寫狀態。真 Drift adapter / 操作紀錄仍待後續接線。
+  - **接續註記（2026-07-06）**：真 Drift adapter 與 #22 操作紀錄已完成：`saveGroup/findGroup` 保存 `status/archived_at`，`archive/restore/restore expired` 寫 `audit_log`；`packages/domain/test/progress_archive_test.dart` 與 `packages/infra/test/drift_progress_repository_test.dart` 覆蓋 CT-08 與持久化。FP7 已補 `LibraryScreen` 歸檔確認、`ProgressSettingsScreen` ARCHIVED 168h 倒數、恢復入口與 EXPIRED disabled 狀態；`app/test/progress/progress_ui_test.dart` 覆蓋 UI。
+- [x] 7.6 實作 reminderConfig 三參數讀寫（預設 15/5/2，存 app_settings 非硬編碼）
   【`[可直接做]`｜Non-scope：不做系統通知推播（v1 App 內提醒）｜驗證：Q9 定案值檢視＋設定往返】
+  - **進度註記（2026-07-06）**：`ReminderConfig.defaults = 15/5/2` 已於 Domain 落地；`ProgressEngine.reminderConfig/setReminderConfig` 透過 `ProgressRepository.loadReminderConfig/saveReminderConfig` 讀寫，Drift adapter 存 `app_settings` 三鍵 `reminder.minutes` / `reminder.failCap` / `reminder.dailySessions`，保存時寫 `audit_log`。`app/lib/features/progress/progress_settings_screen.dart` 提供可測設定 UI；`packages/domain/test/progress_settings_test.dart`、`packages/infra/test/drift_progress_repository_test.dart`、`app/test/progress/progress_ui_test.dart` 綠。
 
 ## 8. 測試與 CI（跨模組；三同步之「測試」端）
 
@@ -130,23 +142,29 @@
   【`[可直接做]`｜Non-scope：不建立 GitHub Actions / 遠端 CI（待 git repo 決策後再接）｜驗證：CT-05、AT-09-01/02；落點：`packages/domain/test/domain_purity_test.dart`】
 - [ ] 8.2 集成核心驗收總表測試套件（CT-01～CT-10 逐條對應之自動化測試常駐 CI；CT-09 授權掃描腳本）
   【`[可直接做]`｜Non-scope：CT-09 之人工簽核流程另列發版 checklist｜驗證：CI 綠＝2.5「必須維持」全數有測試（憲法 C10 三同步）】
+  - **進度註記（2026-07-06）**：CT-09 本機授權 gate 已落地：新增 `scripts/check_licenses.py`、`scripts/test_check_licenses.py`、`release/license-manifest.json` 與 `release/release-checklist.md`。腳本掃 release manifest，擋 GPL/AGPL/CC BY-NC/non-commercial/research-only、擋 bundled Python runtime，並要求 LGPL bundled 元件必須 dynamic linking；unittest 覆蓋 GPL/GPL-3.0 注入、LGPL static linking、bundled Python 與空 manifest。8.2 整體仍未勾選完成，因 CT-01～CT-10 常駐遠端 CI 尚待 GitHub repo/branch protection 最後 gate。
 - [ ] 8.3 效能基準測試：10 秒音檔對齊管線於 i5-8259U 實測，回填 Q10 目標數值
   【`[需要回報]`（實測結果決定是否調整 60s 目標）｜Non-scope：不換演算法（Q10 定案）｜驗證：REQ-01 3.2.6 效能列】
 
 ### 8.4 硬性限制實作（2026-07-05 hard-guardrails skill 使用者裁決 REJECTED 之 5 條）
 
-> 來源：`guardrails/hard-limits-matrix.md` 5 條 REJECTED_NEEDS_IMPLEMENTATION 對應。review/archive 前必須完成，否則 `check_guardrails.py` 會擋交付。
+> 來源：`guardrails/hard-limits-matrix.md` 5 條原始 REJECTED_NEEDS_IMPLEMENTATION 對應。2026-07-07 #9 已落地，matrix 已無 `REJECTED_NEEDS_IMPLEMENTATION`；後續仍由 `check_guardrails.py` 擋住任何新增未落地項。
 
-- [ ] 8.4.1 Branch Protection（matrix #9）：GitHub 端設 main branch protection 阻止 force push；`.githooks/pre-push` 加最小檢查（本機 test 未過不 push）
+- [x] 8.4.1 Branch Protection（matrix #9）：GitHub 端設 main branch protection 阻止 force push；`.githooks/pre-push` 加最小檢查（本機 test 未過不 push）
   【`[需要回報]`（GitHub repo 建立時機由使用者拍板）｜Non-scope：不引入 CI 平台自動 merge check（單人 repo 無 PR）｜驗證：GitHub UI 顯示分支保護規則啟用；本機嘗試 `git push -f main` 失敗】
-- [ ] 8.4.2 Audit Log（matrix #22）：settings/SRS 關鍵設定變更寫入輕量 audit_log（新表 or app_settings 內欄位或本機檔案）；歸類為單人本機自審用途，非稽核級不需 immutable
+  - **進度註記（2026-07-07）**：GitHub repository 已建立為 `https://github.com/karenli628/syllable-repeater`。private repository 建立 ruleset 時 GitHub API 回 403（private rulesets 需 GitHub Pro），使用者明確授權改 public 後，已建立 Repository Ruleset `main branch protection`（id `18580116`）：`enforcement=active`、`target=branch`、include `refs/heads/main`、rules `deletion` + `non_fast_forward`。依使用者限制未執行 `git push --force` 測試。
+- [x] 8.4.2 Audit Log（matrix #22）：settings/SRS 關鍵設定變更寫入輕量 audit_log（新表 or app_settings 內欄位或本機檔案）；歸類為單人本機自審用途，非稽核級不需 immutable
   【`[必須確認]`（涉及 schema 或設定持久化，見 backend-design §3.1.2）｜Non-scope：不做 tamper-proof / append-only；不記錄練習軌跡（已有 attempt 表）｜驗證：改 reminderConfig / AI key 後 audit_log 有一筆；DB schema 檢查 audit_log 表存在（若走表方案）】
-- [ ] 8.4.3 Rate Limit（matrix #23）：AIService.translate 前加內部 rate limiter（例：每分鐘 N 次上限，觸發時就地錯誤`ERR_AI_CALL_FAILED` 加 rate-limit reason），防手滑狂點耗費
+  - **進度註記（2026-07-06）**：使用者已確認採 Drift `audit_log` 表。V2 schema 已新增 `audit_log(id, occurred_at, actor, action, target_type, target_id, metadata_json)` 與 time/action 索引；Domain 新增 `AuditLogEntry` / `AuditLogSink`，敏感 token（key/secret/password/credential/audio/recording/path）拒絕；`ProgressEngine.archive/restore/setReminderConfig` 與 `AIService.configure` 寫入 audit sink。`hard-limits-matrix.md` #22 由 `REJECTED_NEEDS_IMPLEMENTATION` 轉 `PARTIAL`，原因是真 Keychain/provider adapter 與完整 FP7 設定 UI 尚待接線驗證。
+- [x] 8.4.3 Rate Limit（matrix #23）：AIService.translate 前加內部 rate limiter（例：每分鐘 N 次上限，觸發時就地錯誤`ERR_AI_CALL_FAILED` 加 rate-limit reason），防手滑狂點耗費
   【`[可直接做]`｜Non-scope：不做全局 quota（見 DL-011 APPROVED）｜驗證：連續呼叫 N+1 次第 N+1 次立刻返回 rate-limit 錯誤；不呼叫外部 API】
-- [ ] 8.4.4 Network Policy（matrix #31）：AIService 呼叫前檢查目標 URL host 在 hardcode allowlist（AI 服務商官方 domain，如 `api.openai.com`、`api.anthropic.com`），host 不在清單則就地拒絕 `ERR_AI_CALL_FAILED`
+  - **進度註記（2026-07-06）**：`packages/domain/lib/src/ai/ai_service.dart` 於 client 呼叫前維護 window 內呼叫時間；超過 `AiRateLimit.maxRequests` 回 `ERR_AI_CALL_FAILED（rate-limit）`，`packages/domain/test/ai_service_test.dart` 驗證第 N+1 次不呼叫 fake client。
+- [x] 8.4.4 Network Policy（matrix #31）：AIService 呼叫前檢查目標 URL host 在 hardcode allowlist（AI 服務商官方 domain，如 `api.openai.com`、`api.anthropic.com`），host 不在清單則就地拒絕 `ERR_AI_CALL_FAILED`
   【`[可直接做]`｜Non-scope：不做全流量 packet inspection；不接管 OS 網路設定｜驗證：測試改 config 指向 `evil.example.com` → 呼叫返回 host-blocked 錯誤，不發實際請求】
-- [ ] 8.4.5 Prompt Injection Guard（matrix #34）：AIService.translate 前加 sanitizer（strip 明顯 injection 樣式：`ignore previous instructions`、`system:`、`</s>` 等控制標記；標註可疑輸入讓使用者確認），為「未來拿線上歌詞當字稿」情境預備防線
+  - **進度註記（2026-07-06）**：`AIService` 僅允許 `https` 且 host 在 `api.openai.com` / `api.anthropic.com` allowlist；`evil.example.com` 測試回 `ERR_AI_CALL_FAILED（host-blocked）` 且 fake client calls 為空。
+- [x] 8.4.5 Prompt Injection Guard（matrix #34）：AIService.translate 前加 sanitizer（strip 明顯 injection 樣式：`ignore previous instructions`、`system:`、`</s>` 等控制標記；標註可疑輸入讓使用者確認），為「未來拿線上歌詞當字稿」情境預備防線
   【`[可直接做]`｜Non-scope：不做完整 LLM guardrail 服務（如 NeMo Guardrails）｜驗證：注入樣本測試——含 `ignore previous instructions...` 之字稿觸發 sanitizer；乾淨字稿不受影響】
+  - **進度註記（2026-07-06）**：`AIService` 在 client 呼叫前 fail-closed 拒絕 `ignore previous instructions`、`system:`、`developer:`、`</s>`、`<|system|>` 等控制標記；測試驗證可疑字稿不呼叫 fake client。因目前尚無 UI confirmation flow，Domain 層採保守拒絕並回 `ERR_AI_CALL_FAILED（prompt-injection-review-required）`。
 
 ## 9. 建置與發布（macOS）
 
@@ -192,10 +210,11 @@
 
 ## 功能點 1：課件庫與今日到期（library）
 
-- [ ] **實作 LibraryScreen（到期清單置頂＋課件清單）**
+- [x] **實作 LibraryScreen（到期清單置頂＋課件清單）**
   - **File**: `app/lib/features/library/`
   - **Work**: `dueList`（介面 14）掛載/回前景查詢；priority 排序；**不顯示逾期字樣**（M7 介面落地）；空態引導匯入
   - **Purpose**: 「一打開就看到今天該練什麼」（REQ-08 3.1 動機）
+  - **進度註記（2026-07-06）**：已新增 `LibraryScreen`、`libraryDueListProvider` 與 `libraryLessonEntriesProvider`，畫面置頂顯示今日到期清單，空態不顯示逾期/懲罰字樣；課件清單讀 `lesson_registry`，點課件會 open `.abopack`、hydrate 同一 `Lesson` 到 editor/practice，再切 tab。widget test 覆蓋 due item、歸檔確認、課件入口、pack hydrate 與 S6 round-trip。回前景重查 dueList 可留後續增強，但不得新增逾期/失敗/懲罰欄位或文案。
   - _Leverage: EmptyState、DueGroup 型別_｜_Requirements: REQ-08_
   - 【`[可直接做]`｜Non-scope：不做搜尋/分頁（單人本機量小）｜驗證：AT-08-02（無催促/懲罰文案）】
 
@@ -232,38 +251,40 @@
   - **進度註記（2026-07-06）**：`EditorController` (Riverpod Notifier) 完成 dragStart/dragUpdate/dragEnd/undo/clearError；監聽 pipeline done 自動 loadFrom 初始化；`ERR_BOUNDARY_INVALID` 回彈原值＋SnackBar；⌘Z（macOS Meta）/^Z（其他）走 `Focus.onKeyEvent`。
   - _Leverage: 介面 2 欄位表_｜_Requirements: REQ-02_
   - 【`[可直接做]`｜Non-scope：業務驗證不在 UI 重算（開區間規則歸 Domain）｜驗證：AT-02-01～05；`app/test/editor/editor_controller_test.dart` 7/7 全綠】
-- [ ] **實作單音節試聽與韻律疊圖顯示**
+- [x] **實作單音節試聽與韻律疊圖顯示**
   - **File**: `app/lib/features/editor/widgets/prosody_overlay.dart`
   - **Work**: 點音節→介面 4 試聽（≤200ms 啟動）；介面 7 疊圖（音高曲線/重音；pitchAvailable=false 顯示徽章）
   - **Purpose**: 校正即時驗證＋S4 視覺化
-  - **進度註記（2026-07-06）**：試聽 stub 已在 SyllableChipsRow 掛按鈕（點擊顯示「S2 接入」SnackBar）；真試聽依賴 S2 task 4.4 renderStep + 4.7 單音節 helper。韻律疊圖屬 S4，本輪 Non-scope。
+  - **進度註記（2026-07-06）**：S2 已把 SyllableChipsRow 試聽接成真 `PracticeEngine.singleSyllableStep` + `PracticePlayer.playStep(... repeatN: 1)`；S4 已新增 `ProsodyOverlayControls`，`EditorController` 在 analysis done / 邊界校正 / undo 後同步 `AsyncValue<Prosody>`，`WaveformCanvas` 疊圖顯示 pitch curve、stress markers 與 invalid/NaN 音節灰底；`pitchAvailable=false` 顯示「音高不可用」徽章而非錯誤。
   - _Leverage: 4.7 試聽輔助、介面 7 欄位表_｜_Requirements: REQ-02、REQ-05_
   - 【`[可直接做]`｜Non-scope：不做疊圖匯出圖片｜驗證：AT-05-01/02】
 
 ## 功能點 4：句尾疊加練習（practice）
 
-- [ ] **實作 PracticeScreen 步驟導航與播放**
+- [x] **實作 PracticeScreen 步驟導航與播放**
   - **File**: `app/lib/features/practice/`
   - **Work**: buildSteps（介面 3）；StepNavigator（11 步顯示音節文字）；PlayerBar（renderStep→just_audio ×N；repeatN Stepper 1–10 預設 3）；切步先 stop
   - **Purpose**: 「第 1 步即點即聽」（REQ-03 動機）
   - _Leverage: 介面 3/4、shared/player_｜_Requirements: REQ-03_
   - 【`[可直接做]`｜Non-scope：不做自動連播全步（v1 手動導航）｜驗證：AT-03-01/03/05/06】
-- [ ] **實作錄音比對面板與疊圖**
+- [x] **實作錄音比對面板與疊圖**
   - **File**: `app/lib/features/practice/widgets/record_panel.dart`、`overlay_chart.dart`
   - **Work**: record 套件錄音＋電平表；錄音中原音鈕置灰；停止→介面 8 比對；OverlayChart 雙波形/音高＋diffRanges 標色；切步/卸載中止並丟棄
   - **Purpose**: 「差在哪一段」看得見（REQ-06 動機）
   - _Leverage: 介面 8 欄位表、tokens 差異色_｜_Requirements: REQ-06_
   - 【`[可直接做]`｜Non-scope：不保留錄音（M10；Domain 已刪，UI 不另存）｜驗證：AT-06-01/02/03/05】
-- [ ] **實作難度結算列（困難/普通/輕鬆）**
+  - **進度註記（2026-07-06）**：已新增 `practice_recording.dart`（record 套件錄 WAV、level stream、`PracticeComparisonService`）、`RecordPanel`、`OverlayChart`，並接入 `PracticeScreen`。`PracticeController` 錄音中停用 playback，停止後呼叫 compare 並顯示節奏/語調差異與疊圖；過短錄音保留錯誤、`comparison=null`；錄音中切步會 cancel 並清空暫存狀態；macOS 已補 `NSMicrophoneUsageDescription` 與 audio-input entitlement，未更動 app sandbox。
+- [x] **實作難度結算列（困難/普通/輕鬆）**
   - **File**: `app/lib/features/practice/widgets/settle_bar.dart`
   - **Work**: 介面 13 settle；顯示回傳 nextDue（「下次：7/8」）
   - **Purpose**: SRS 閉環入口
+  - **進度註記（2026-07-06）**：已新增 `SettleBar` 並接入 `PracticeScreen`，三個按鈕呼叫 `ProgressService.settle`，成功後顯示 nextDue；`PracticeScreen` 依目前 lesson/step 建出穩定 `PracticeGroup`，`SettleBar` 結算前先呼叫 `ProgressService.ensurePracticeGroup`，`DriftProgressRepository.saveGroup` 會替未註冊 lesson 建最小 `lesson_registry` row。`app/test/progress/progress_ui_test.dart` 覆蓋「普通」按鈕與 ensure group。
   - _Leverage: 介面 13_｜_Requirements: REQ-08_
   - 【`[可直接做]`｜Non-scope：不顯示任何失敗/懲罰語彙（M7）｜驗證：AT-08-01】
 
 ## 功能點 5：匯出（export）
 
-- [ ] **實作匯出對話框（勾選→路徑→進度→完成）**
+- [x] **實作匯出對話框（勾選→路徑→進度→完成）**
   - **File**: `app/lib/features/export/export_dialog.dart`
   - **Work**: 步驟勾選清單（未勾置灰）；macOS 存檔對話框；介面 5/6 呼叫；完成顯示路徑＋「在 Finder 顯示」＋silenceGapsMs 摺疊資訊；`ERR_EXPORT_*` 就地處理、勾選保留
   - **Purpose**: 3 步匯出離線練習檔（REQ-04 動機）
@@ -272,25 +293,28 @@
 
 ## 功能點 6：課件儲存/開啟與譯文（pack_translate）
 
-- [ ] **實作課件儲存/開啟（⌘S／⌘O）與譯文編輯**
+- [x] **實作課件儲存/開啟（⌘S／⌘O）與譯文編輯**
   - **File**: `app/lib/features/pack_translate/`
   - **Work**: 介面 9/10；`ERR_PACK_CORRUPTED` 整頁錯誤態不部分渲染；譯文欄手動輸入即標 manual；「自動翻譯」鈕（介面 12）未設 key 停用＋tooltip；ai 回應晚於手動輸入則丟棄
   - **Purpose**: 「沒設 key 也永遠能手動」（REQ-07 阻力點對策）
+  - **進度註記（2026-07-06）**：已在 `LibraryScreen` 放入 FP6 UI shell：手動譯文輸入永遠可編輯，自動翻譯鈕未設 key 停用並顯示 tooltip。新增 `lesson_pack_service.dart`，以 `LessonPackEngine + AtomicFileIo + file_selector` 真開啟/儲存 `.abopack`，成功後同步 `lesson_registry`；`AppLessonPackService.open` 先用 Domain `decodeWav` 驗證 pack audio，損毀/解碼失敗顯示 `ERR_PACK_CORRUPTED` 或 `ERR_DECODE_FAILED` 且不覆蓋現有 UI state。新增 `lesson_session_controller.dart`，開啟/課件卡/儲存後 hydrate 同一 `Lesson` 到 editor/practice，單音節試聽與 PracticeScreen 優先使用 pack session PCM/peaks；`CallbackShortcuts` 已接 ⌘O/⌘S 與 Ctrl+O/Ctrl+S。AI 回應與 manual 覆蓋仍維持 Domain `mergeTranslation` 規則；真 provider adapter 待 7.2 外部契約確認。
   - _Leverage: 介面 9/10/12 欄位表_｜_Requirements: REQ-07_
   - 【`[可直接做]`｜Non-scope：不做多語譯文（v1 單目標語 zh-TW 預設）｜驗證：AT-07-01～04/06】
 
 ## 功能點 7：進度、SRS 與設定（progress_settings）
 
-- [ ] **實作歸檔管理與進度匯入匯出**
+- [x] **實作歸檔管理與進度匯入匯出**
   - **File**: `app/lib/features/progress_settings/`
   - **Work**: 歸檔前確認對話框；ARCHIVED 顯示 168h 恢復倒數；EXPIRED 恢復鈕不可用；介面 15/16；MergeSummary 對話框（applied/skipped/resetLessons 列名）
   - **Purpose**: 誤歸檔可反悔、合併結果透明（M6/M8 介面落地）
+  - **進度註記（2026-07-06）**：Domain/infra 介面已可用（`ProgressEngine.archive/restore/exportProgress/importProgress` + `DriftProgressRepository`）；`ProgressSettingsScreen` 已接 `file_selector` 匯出/匯入 `.aboprogress`，匯入後顯示 MergeSummary 對話框與頁面回顯；`LibraryScreen` 歸檔前會跳確認對話框，設定頁顯示 ARCHIVED 168h 恢復倒數，EXPIRED 恢復鈕停用。widget test 已覆蓋匯入匯出、歸檔確認、倒數與恢復。
   - _Leverage: 介面 15–18 欄位表_｜_Requirements: REQ-08_
   - 【`[可直接做]`｜Non-scope：不做自動排程備份（使用者手動匯出）｜驗證：AT-08-03/05/06/07】
-- [ ] **實作設定頁（提醒三參數／AI key／sidecar 逾時）**
+- [x] **實作設定頁（提醒三參數／AI key／sidecar 逾時）**
   - **File**: 同上 `settings_screen.dart`
   - **Work**: 三參數控件預設 15/5/2（介面 19）；AI key obscure 輸入→介面 11 送出即清空欄位（UI 不留副本）；sidecar.timeoutSec 設定
   - **Purpose**: Q9 可調落地＋M10 key 安全
+  - **進度註記（2026-07-06）**：提醒三參數 UI 已落地於 `app/lib/features/progress/progress_settings_screen.dart`，保存後寫 app_settings 並觸發 audit log，widget test 覆蓋讀寫；AI key obscure 輸入已接 `AiSettingsService.configureCredential`，送出後清空欄位，當前使用 `InMemoryAiSecureStore` + `NoopAiClient` 走 `AIService.configure` 與 audit，不實作真 HTTP/Keychain；`SidecarConfig.timeoutSeconds` 已於 Domain/Drift/app_settings/UI stepper 落地，保存寫 `sidecar_config_changed` audit。真 Keychain/provider adapter 仍待服務商契約與 key 安全路徑回報後再做。
   - _Leverage: 介面 11/19_｜_Requirements: REQ-07、REQ-08_
   - 【`[可直接做]`｜Non-scope：key 不做「顯示已存值」（Keychain 單向）｜驗證：AT-07-05、Q9 設定往返】
 

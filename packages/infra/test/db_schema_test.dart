@@ -1,6 +1,6 @@
 // AI-Generate
 // Drift schema V1 結構測試（task-split 1.2）：
-// 五表齊備、attempt 表結構上無音訊欄位（CT-10 結構防線）、
+// 表齊備、attempt 表結構上無音訊欄位（CT-10 結構防線）、
 // practice_group 無逾期/失敗欄位（M7 結構防線）。
 import 'package:drift/native.dart';
 import 'package:infra/infra.dart';
@@ -17,8 +17,7 @@ void main() {
 
   Future<List<String>> tableNames() async {
     final rows = await db
-        .customSelect(
-            "SELECT name FROM sqlite_master WHERE type='table' "
+        .customSelect("SELECT name FROM sqlite_master WHERE type='table' "
             "AND name NOT LIKE 'sqlite_%'")
         .get();
     return rows.map((r) => r.read<String>('name')).toList();
@@ -29,7 +28,7 @@ void main() {
     return rows.map((r) => r.read<String>('name')).toList();
   }
 
-  test('五張表齊備且表名與設計一致（backend-design §3.1.2）', () async {
+  test('六張表齊備且表名與設計一致（backend-design §3.1.2 / #22）', () async {
     final names = await tableNames();
     expect(
         names,
@@ -39,6 +38,7 @@ void main() {
           'srs_state',
           'attempt',
           'app_settings',
+          'audit_log',
         ]));
   });
 
@@ -71,11 +71,32 @@ void main() {
     }
   });
 
-  test('索引齊備（idx_pg_sync_key / idx_pg_status / idx_srs_due / idx_attempt_group）',
-      () async {
+  test('audit_log 表結構不含 key/audio/recording/path 欄位（#22/M10/C6）', () async {
+    final cols = await columnsOf('audit_log');
+    expect(
+        cols,
+        unorderedEquals([
+          'id',
+          'occurred_at',
+          'actor',
+          'action',
+          'target_type',
+          'target_id',
+          'metadata_json',
+        ]));
+    for (final c in cols) {
+      expect(c.toLowerCase(), isNot(contains('api_key')));
+      expect(c.toLowerCase(), isNot(contains('secret')));
+      expect(c.toLowerCase(), isNot(contains('password')));
+      expect(c.toLowerCase(), isNot(contains('audio')));
+      expect(c.toLowerCase(), isNot(contains('recording')));
+      expect(c.toLowerCase(), isNot(contains('path')));
+    }
+  });
+
+  test('索引齊備（progress + audit log）', () async {
     final rows = await db
-        .customSelect(
-            "SELECT name FROM sqlite_master WHERE type='index' "
+        .customSelect("SELECT name FROM sqlite_master WHERE type='index' "
             "AND name LIKE 'idx_%'")
         .get();
     final names = rows.map((r) => r.read<String>('name')).toList();
@@ -86,6 +107,8 @@ void main() {
           'idx_pg_status',
           'idx_srs_due',
           'idx_attempt_group',
+          'idx_audit_log_time',
+          'idx_audit_log_action',
         ]));
   });
 

@@ -22,6 +22,7 @@ class WaveformCanvas extends StatelessWidget {
     required this.onDragStart,
     required this.onDragUpdate,
     required this.onDragEnd,
+    this.prosody,
     this.hitToleranceDp = 12,
   });
 
@@ -30,6 +31,7 @@ class WaveformCanvas extends StatelessWidget {
   final int totalDurationMs;
   final int? draggingBoundaryIndex;
   final int? draggingPreviewMs;
+  final Prosody? prosody;
 
   final ValueChanged<int> onDragStart;
   final ValueChanged<int> onDragUpdate;
@@ -68,8 +70,7 @@ class WaveformCanvas extends StatelessWidget {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onPanDown: (details) {
-            final index =
-                _hitTestBoundary(details.localPosition.dx, width);
+            final index = _hitTestBoundary(details.localPosition.dx, width);
             if (index != null) onDragStart(index);
           },
           onPanUpdate: (details) {
@@ -92,16 +93,23 @@ class WaveformCanvas extends StatelessWidget {
                 totalDurationMs: totalDurationMs,
                 draggingBoundaryIndex: draggingBoundaryIndex,
                 draggingPreviewMs: draggingPreviewMs,
+                prosody: prosody,
                 waveformColor: colorScheme.primary,
                 needsReviewColor: AppTokens.needsReview,
+                invalidSyllableColor: colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.7),
                 boundaryColor: colorScheme.outline,
                 draggingColor: colorScheme.tertiary,
-                surfaceColor:
-                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                pitchColor: colorScheme.secondary,
+                stressColor: colorScheme.tertiary,
+                surfaceColor: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
               ),
-              size: Size(width, constraints.hasBoundedHeight
-                  ? constraints.maxHeight
-                  : 180),
+              size: Size(
+                width,
+                constraints.hasBoundedHeight ? constraints.maxHeight : 180,
+              ),
             ),
           ),
         );
@@ -117,10 +125,14 @@ class _WaveformPainter extends CustomPainter {
     required this.totalDurationMs,
     required this.draggingBoundaryIndex,
     required this.draggingPreviewMs,
+    required this.prosody,
     required this.waveformColor,
     required this.needsReviewColor,
+    required this.invalidSyllableColor,
     required this.boundaryColor,
     required this.draggingColor,
+    required this.pitchColor,
+    required this.stressColor,
     required this.surfaceColor,
   });
 
@@ -129,10 +141,14 @@ class _WaveformPainter extends CustomPainter {
   final int totalDurationMs;
   final int? draggingBoundaryIndex;
   final int? draggingPreviewMs;
+  final Prosody? prosody;
   final Color waveformColor;
   final Color needsReviewColor;
+  final Color invalidSyllableColor;
   final Color boundaryColor;
   final Color draggingColor;
+  final Color pitchColor;
+  final Color stressColor;
   final Color surfaceColor;
 
   @override
@@ -149,10 +165,17 @@ class _WaveformPainter extends CustomPainter {
       if (!syllable.needsReview) continue;
       final left = (syllable.startMs / totalDurationMs) * size.width;
       final right = (syllable.endMs / totalDurationMs) * size.width;
-      canvas.drawRect(
-        Rect.fromLTRB(left, 0, right, size.height),
-        reviewPaint,
-      );
+      canvas.drawRect(Rect.fromLTRB(left, 0, right, size.height), reviewPaint);
+    }
+
+    // AT-05-03：資料損毀/無有效樣本音節以灰底標記，整體仍可渲染。
+    final invalidPaint = Paint()..color = invalidSyllableColor;
+    for (var i = 0; i < syllables.length; i++) {
+      if (!_isInvalidSyllable(i)) continue;
+      final syllable = syllables[i];
+      final left = (syllable.startMs / totalDurationMs) * size.width;
+      final right = (syllable.endMs / totalDurationMs) * size.width;
+      canvas.drawRect(Rect.fromLTRB(left, 0, right, size.height), invalidPaint);
     }
 
     // 波形 bars
@@ -171,6 +194,9 @@ class _WaveformPainter extends CustomPainter {
       }
     }
 
+    _drawPitchCurve(canvas, size);
+    _drawStressMarkers(canvas, size);
+
     // 邊界線（不畫拖動中那條，改畫 preview）
     final boundaryPaint = Paint()
       ..color = boundaryColor
@@ -179,8 +205,7 @@ class _WaveformPainter extends CustomPainter {
       if (i == draggingBoundaryIndex) continue;
       final boundaryMs = syllables[i].endMs;
       final x = (boundaryMs / totalDurationMs) * size.width;
-      canvas.drawLine(
-          Offset(x, 0), Offset(x, size.height), boundaryPaint);
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), boundaryPaint);
     }
 
     // 拖動預覽線（藍/主色，高亮突出）
@@ -189,8 +214,7 @@ class _WaveformPainter extends CustomPainter {
       final draggingPaint = Paint()
         ..color = draggingColor
         ..strokeWidth = 2;
-      canvas.drawLine(
-          Offset(x, 0), Offset(x, size.height), draggingPaint);
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), draggingPaint);
     }
   }
 
@@ -198,8 +222,78 @@ class _WaveformPainter extends CustomPainter {
   bool shouldRepaint(covariant _WaveformPainter old) {
     return old.peaks != peaks ||
         old.syllables != syllables ||
+        old.prosody != prosody ||
         old.totalDurationMs != totalDurationMs ||
         old.draggingBoundaryIndex != draggingBoundaryIndex ||
         old.draggingPreviewMs != draggingPreviewMs;
+  }
+
+  bool _isInvalidSyllable(int index) {
+    final current = prosody;
+    if (current == null) return false;
+    final rhythmInvalid =
+        index < current.rhythm.length && current.rhythm[index].isNaN;
+    final stressInvalid =
+        index < current.stress.length && current.stress[index].isNaN;
+    return rhythmInvalid || stressInvalid;
+  }
+
+  void _drawPitchCurve(Canvas canvas, Size size) {
+    final current = prosody;
+    final pitch = current?.pitchContour;
+    if (current == null ||
+        !current.pitchAvailable ||
+        pitch == null ||
+        pitch.length < 2) {
+      return;
+    }
+
+    final finitePitch = pitch.where((value) => value.isFinite).toList();
+    if (finitePitch.length < 2) return;
+
+    final minPitch = finitePitch.reduce((a, b) => a < b ? a : b);
+    final maxPitch = finitePitch.reduce((a, b) => a > b ? a : b);
+    final span = maxPitch - minPitch;
+
+    final path = Path();
+    var started = false;
+    for (var i = 0; i < pitch.length; i++) {
+      final value = pitch[i];
+      if (!value.isFinite) continue;
+      final x = pitch.length == 1 ? 0.0 : (i / (pitch.length - 1)) * size.width;
+      final normalized = span <= 0 ? 0.5 : (value - minPitch) / span;
+      final y = size.height * (0.62 - normalized * 0.42);
+      if (!started) {
+        path.moveTo(x, y);
+        started = true;
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    if (!started) return;
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = pitchColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+  }
+
+  void _drawStressMarkers(Canvas canvas, Size size) {
+    final stress = prosody?.stress;
+    if (stress == null || stress.isEmpty || syllables.isEmpty) return;
+
+    final markerPaint = Paint()..color = stressColor.withValues(alpha: 0.8);
+    for (var i = 0; i < syllables.length && i < stress.length; i++) {
+      final value = stress[i];
+      if (!value.isFinite) continue;
+      final syllable = syllables[i];
+      final centerMs = (syllable.startMs + syllable.endMs) / 2;
+      final x = (centerMs / totalDurationMs) * size.width;
+      final radius = 3 + value.clamp(0.0, 1.0) * 5;
+      canvas.drawCircle(Offset(x, size.height - 18), radius, markerPaint);
+    }
   }
 }
