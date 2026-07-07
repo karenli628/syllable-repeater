@@ -17,8 +17,8 @@ python3 scripts/prepare_release_sidecars.py \
   --whisper-model .local-tools/whisper.cpp/models/ggml-small.en.bin \
   --whisper-lib-dir .local-tools/whisper.cpp/build/bin \
   --cmudict .local-tools/cmudict/cmudict.dict \
-  --demucs-cli /path/to/demucs.cpp \
-  --demucs-model /path/to/ggml-model-htdemucs
+  --demucs-cli /path/to/demucs.cpp.main \
+  --demucs-model /path/to/ggml-model-htdemucs-4s-f16.bin
 ```
 
 The script rejects GPL/nonfree FFmpeg builds. Homebrew FFmpeg is dev-only

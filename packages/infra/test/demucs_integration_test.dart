@@ -12,12 +12,8 @@ import 'package:test/test.dart';
 
 /// S1c 真整合測試（task-split 3.8）：`.local-tools/demucs.cpp/` 就緒時對使用者
 /// mp3 跑真 demucs.cpp CLI + FFmpeg 讀回 vocals PCM；缺失即 skip。
-///
-/// **首次跑通後**：若 sevagh/demucs.cpp CLI 語法與 `demucs_separator.dart` 內
-/// `args` 常數不符，改該處常數即可（backend-design §3.2.1 契約推測；本測試
-/// 是使用者本機首次驗證的地方）。
 void main() {
-  test('S1c demo：真 demucs.cpp 分離出 vocals.wav → 解碼回 PCM 非空', () async {
+  test('S1c demo：真 demucs.cpp 分離出 vocals → 解碼回 PCM 非空', () async {
     final root = Directory.current.parent.parent;
     final ffmpeg = _firstExisting([
       '/usr/local/bin/ffmpeg',
@@ -25,11 +21,11 @@ void main() {
     ]);
     final demucsCli = File(p.join(
       root.path,
-      '.local-tools/demucs.cpp/build/bin/demucs.cpp',
+      '.local-tools/demucs.cpp/build/demucs.cpp.main',
     ));
-    final modelDir = Directory(p.join(
+    final modelPath = File(p.join(
       root.path,
-      '.local-tools/demucs.cpp/ggml-model-htdemucs',
+      '.local-tools/demucs.cpp/ggml-demucs/ggml-model-htdemucs-4s-f16.bin',
     ));
     final audio = File(p.join(
       root.path,
@@ -44,7 +40,7 @@ void main() {
       markTestSkipped('demucs.cpp local build not installed (S1c 使用者本機事宜)');
       return;
     }
-    if (!modelDir.existsSync()) {
+    if (!modelPath.existsSync()) {
       markTestSkipped('demucs.cpp htdemucs model not installed');
       return;
     }
@@ -64,7 +60,7 @@ void main() {
       runner: runner,
       decoder: FfmpegDecoder(runner: runner, ffmpegPath: ffmpeg.path),
       demucsCliPath: demucsCli.path,
-      modelDir: modelDir.path,
+      modelPath: modelPath.path,
       outputDirectory: workRoot.path,
     );
 
@@ -73,11 +69,12 @@ void main() {
       separateVocals: true,
     );
     final decodedPcm = Pcm(await _emptyInt16List(),
-        sampleRate: 44100); // pipeline 實際 decodedPcm 不影響 demucs（demucs 用 audioPath）
+        sampleRate:
+            44100); // pipeline 實際 decodedPcm 不影響 demucs（demucs 用 audioPath）
 
     final result = await separator.separate(request, decodedPcm: decodedPcm);
 
-    expect(result.audioPath, endsWith('vocals.wav'));
+    expect(result.audioPath, endsWith('target_3_vocals.wav'));
     expect(File(result.audioPath).existsSync(), isTrue);
     expect(result.pcm.samples, isNotEmpty);
     expect(result.pcm.sampleRate, 44100);

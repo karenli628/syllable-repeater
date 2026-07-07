@@ -1,6 +1,6 @@
 # 交接檔 — fullstack-code-implementation 2.1 Sidecar Release Staging
 
-> 給下一個 coding agent：本檔接續 2026-07-07 session。請先讀 `02_Memory/constitution.md`、`preferences.md`、`MEMORY.md`，再讀本專案 `spec-syllable-repeater/memory/` 相關記憶，特別是 `workflow_release_sidecar_staging_gate_s6.md`、`workflow_github_actions_core_ci_gate_s6.md`、`workflow_alignment_pipeline_benchmark_q10.md`、`workflow_ct09_license_gate_release_manifest_s6.md`、`workflow_flutter_workspace_dart_test_gotcha.md`、`pitfall_dart_sdk_sandbox_cpuinfo_crash.md`。
+> 給下一個 coding agent：本檔接續 2026-07-07 session。請先讀 `02_Memory/constitution.md`、`preferences.md`、`MEMORY.md`，再讀本專案 `spec-syllable-repeater/memory/` 相關記憶，特別是 `workflow_release_sidecar_staging_gate_s6.md`、`workflow_demucs_cpp_official_cli_contract_s6.md`、`workflow_github_actions_core_ci_gate_s6.md`、`workflow_alignment_pipeline_benchmark_q10.md`、`workflow_ct09_license_gate_release_manifest_s6.md`、`workflow_flutter_workspace_dart_test_gotcha.md`、`pitfall_dart_sdk_sandbox_cpuinfo_crash.md`。
 
 ## 本輪完成
 
@@ -13,6 +13,7 @@
   - `scripts/prepare_release_sidecars.py`：staging 前跑 CT-09 license gate，拒絕 GPL/nonfree 或非 shared FFmpeg/ffprobe，產出 `sidecar-manifest.json`。
   - `scripts/test_prepare_release_sidecars.py`：覆蓋 GPL FFmpeg 被拒絕與合法 fake bundle 產出 release layout。
   - `app/macos/Runner/Scripts/copy_release_sidecars.sh` + Xcode Release build phase：Release build 缺 sidecar staging 即 fail-closed；Debug/Profile 跳過。
+  - 2026-07-07 後續校正：依 sevagh/demucs.cpp 官方 README（`https://raw.githubusercontent.com/sevagh/demucs.cpp/main/README.md`），demucs CLI 使用 `demucs.cpp.main <model-file> <input-audio> <out-dir>`；bundle 內檔名為 `bin/demucs.cpp.main` 與 `models/ggml-model-htdemucs-4s-f16.bin`，vocals 輸出讀 `target_3_vocals.wav`。
   - `release/license-manifest.json` 補 `OpenAI Whisper small.en model`（MIT）。
 - 實體 binaries/models 不進 git：`app/macos/Runner/Resources/sidecar/.gitignore` 只允許 README/gitignore。
 
@@ -21,17 +22,18 @@
 - `python3 scripts/check_licenses.py .../release/license-manifest.json` ✅（19 components）
 - `python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py` ✅（8 tests）
 - `flutter test app/test/shared/sidecar_paths_test.dart` ✅
-- `python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機 artifact 狀態正確失敗：`.local-tools/demucs.cpp/build/bin/demucs.cpp` 與 `ggml-model-htdemucs` 不存在。
+- `python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機 artifact 狀態正確失敗：`.local-tools/demucs.cpp/build/demucs.cpp.main` 與 `ggml-model-htdemucs-4s-f16.bin` 不存在。
 - `/usr/local/bin/ffmpeg -version` 顯示 `--enable-gpl`，此 Homebrew build 只能 dev-only，不可 release bundled。
 - `bash scripts/ci_core_checks.sh` 本機通過；推送後遠端 Core CI run `28835738044` 也通過。
+- demucs CLI 校正後，本機 `bash scripts/ci_core_checks.sh` 再次通過（domain 82/82、infra 67/67、app 59/59、`flutter analyze` No issues）。
 
 ## 目前 2.1 狀態
 
 2.1 尚未勾完成。原因不是 code 未接，而是 release 實體 artifacts 未就緒：
 
 - 需要 LGPL-only、shared/dynamic FFmpeg + ffprobe。
-- 需要 demucs.cpp x86_64 binary。
-- 需要 htdemucs ggml model artifact。
+- 需要 demucs.cpp x86_64 binary（官方 build 產物 `demucs.cpp.main`）。
+- 需要 htdemucs ggml model artifact（`ggml-model-htdemucs-4s-f16.bin`）。
 - whisper.cpp CLI、whisper dylibs、`ggml-small.en.bin`、CMUdict 本機目前有，但 release staging 必須等 FFmpeg/demucs 一起就緒後再跑。
 
 ## 下一步順序

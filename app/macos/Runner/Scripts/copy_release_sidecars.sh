@@ -15,9 +15,9 @@ sidecar-manifest.json
 bin/ffmpeg
 bin/ffprobe
 bin/whisper-cli
-bin/demucs.cpp
+bin/demucs.cpp.main
 models/ggml-small.en.bin
-models/ggml-model-htdemucs
+models/ggml-model-htdemucs-4s-f16.bin
 data/cmudict.dict
 "
 

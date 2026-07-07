@@ -39,12 +39,13 @@ void main() {
     );
     expect(
       paths.demucsCliPath,
-      endsWith('${separator}sidecar${separator}bin${separator}demucs.cpp'),
+      endsWith('${separator}sidecar${separator}bin${separator}demucs.cpp.main'),
     );
     expect(
-      paths.demucsModelDir,
+      paths.demucsModelPath,
       endsWith(
-        '${separator}sidecar${separator}models${separator}ggml-model-htdemucs',
+        '${separator}sidecar${separator}models'
+        '${separator}ggml-model-htdemucs-4s-f16.bin',
       ),
     );
   });

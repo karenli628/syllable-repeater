@@ -227,14 +227,14 @@
 - **狀態**：Done
 - **產物（新增）**：
   - `packages/infra/lib/src/sidecar/demucs_separator.dart`（`DemucsCppVocalSeparator implements AnalysisVocalSeparator`）
-  - `packages/infra/test/demucs_separator_test.dart`（7 情境：exit≠0／kill -9／timeout／spawn／vocals.wav 未生成／成功 CLI+decoder 讀回／workDir sanitize）
+  - `packages/infra/test/demucs_separator_test.dart`（7 情境：exit≠0／kill -9／timeout／spawn／`target_3_vocals.wav` 未生成／成功 CLI+decoder 讀回／workDir sanitize）
   - `packages/infra/test/demucs_integration_test.dart`（`@Tags(['sidecar'])`；缺 demucs 二進位/模型即 `markTestSkipped`）
 - **產物（修改）**：`packages/infra/lib/infra.dart`（export demucs_separator）
 
 ### Task S1c-1/5 SidecarPaths 擴充＋條件性注入
 - **狀態**：Done
 - **產物（修改）**：
-  - `app/lib/shared/infra/sidecar_paths.dart`：加 `demucsCliPath`／`demucsModelDir`（env `DEMUCS_CLI_PATH`／`DEMUCS_MODEL_DIR` 覆寫，fallback `.local-tools/demucs.cpp/build/bin/demucs.cpp`／`.local-tools/demucs.cpp/ggml-model-htdemucs`）；`missingPaths()` 不納入 demucs；新增 `demucsAvailable()` bool
+  - `app/lib/shared/infra/sidecar_paths.dart`：加 `demucsCliPath`／`demucsModelPath`（env `DEMUCS_CLI_PATH`／`DEMUCS_MODEL_PATH` 覆寫，`DEMUCS_MODEL_DIR` 暫作相容 fallback；預設 `.local-tools/demucs.cpp/build/demucs.cpp.main`／`.local-tools/demucs.cpp/ggml-demucs/ggml-model-htdemucs-4s-f16.bin`）；`missingPaths()` 不納入 demucs；新增 `demucsAvailable()` bool
   - `app/lib/shared/infra/infra_analysis_runner.dart`：`paths.demucsAvailable()` 條件性建 `DemucsCppVocalSeparator` 注入 pipeline；未就緒時 `vocalSeparator: null`，pipeline 內 `if (vocalSeparator != null)` 走 null 分支自動降級（backend-design §5 第 704 行、M4）
   - `app/lib/main.dart`：新增 `demucsReadyProvider.overrideWithValue(paths.demucsAvailable())` 無條件覆寫（供 UI 讀）
   - `app/lib/features/import_analysis/analysis_controller.dart`：新增 `demucsReadyProvider`（預設 false，widget test 無覆寫即等同「未就緒」）
@@ -747,7 +747,8 @@
   - `flutter test app/test/shared/sidecar_paths_test.dart` ✅
   - `bash scripts/ci_core_checks.sh` ✅（本機完整 Core CI）
   - GitHub Actions Core CI run `28835738044` ✅（commit `044772f chore: add release sidecar staging gate`，job `CT-01..CT-10 and guardrails` 3m1s）
-  - 實際 dry-run：`python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機狀態正確失敗，因 `.local-tools/demucs.cpp/build/bin/demucs.cpp` 與 `ggml-model-htdemucs` 不存在；另 `/usr/local/bin/ffmpeg -version` 顯示 `--enable-gpl`，只能作 dev-only，不得進 release bundle。
+  - 實際 dry-run：`python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機狀態正確失敗，因 `.local-tools/demucs.cpp/build/demucs.cpp.main` 與 `ggml-model-htdemucs-4s-f16.bin` 不存在；另 `/usr/local/bin/ffmpeg -version` 顯示 `--enable-gpl`，只能作 dev-only，不得進 release bundle。
+- **後續校正（2026-07-07）**：依 sevagh/demucs.cpp 官方 README（`https://raw.githubusercontent.com/sevagh/demucs.cpp/main/README.md`），真 CLI 是 `demucs.cpp.main <model-file> <input-audio> <out-dir>`，4-source htdemucs vocals 輸出為 `target_3_vocals.wav`；已同步 `DemucsCppVocalSeparator`、SidecarPaths、release staging script、Release build phase、測試與文件。此校正只修正 S1c/2.1 的真 artifact contract，不改已完成的降級策略。本地 `bash scripts/ci_core_checks.sh` 再次通過（domain 82/82、infra 67/67、app 59/59、`flutter analyze` No issues）。
 - **結論**：2.1 的可程式化防線已落地；實體 x86_64 sidecar bundle 必須等 LGPL-only FFmpeg/ffprobe（dynamic/shared）與 demucs.cpp binary/model artifacts 就緒後再跑 staging，屆時才能勾選 2.1 完成並進入 9.1 release build。
 
 ## e2e 驗收紀錄 — S1a Frontend FP2

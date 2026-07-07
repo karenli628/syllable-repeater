@@ -30,7 +30,7 @@ class InfraAnalysisRunner implements AnalysisRunner {
             runner: runner,
             decoder: decoder,
             demucsCliPath: paths.demucsCliPath,
-            modelDir: paths.demucsModelDir,
+            modelPath: paths.demucsModelPath,
             outputDirectory: paths.tempDirectory,
           )
         : null;
@@ -60,6 +60,5 @@ class InfraAnalysisRunner implements AnalysisRunner {
   Stream<AnalysisEvent> analyze(
     ImportRequest request, {
     PipelineCheckpoint? resume,
-  }) =>
-      _pipeline.analyze(request, resume: resume);
+  }) => _pipeline.analyze(request, resume: resume);
 }

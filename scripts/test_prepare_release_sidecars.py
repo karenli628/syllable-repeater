@@ -33,9 +33,9 @@ class PrepareReleaseSidecarsTest(unittest.TestCase):
                 "--cmudict",
                 str(_file(root / "cmudict.dict")),
                 "--demucs-cli",
-                str(_fake_executable(root / "demucs.cpp", "demucs\n")),
+                str(_fake_executable(root / "demucs.cpp.main", "demucs\n")),
                 "--demucs-model",
-                str(_dir(root / "ggml-model-htdemucs")),
+                str(_file(root / "ggml-model-htdemucs-4s-f16.bin")),
                 "--license-manifest",
                 str(_manifest(root / "license-manifest.json")),
                 "--output-dir",
@@ -61,9 +61,9 @@ class PrepareReleaseSidecarsTest(unittest.TestCase):
                 "--cmudict",
                 str(_file(root / "cmudict.dict")),
                 "--demucs-cli",
-                str(_fake_executable(root / "demucs.cpp", "demucs\n")),
+                str(_fake_executable(root / "demucs.cpp.main", "demucs\n")),
                 "--demucs-model",
-                str(_dir(root / "ggml-model-htdemucs")),
+                str(_file(root / "ggml-model-htdemucs-4s-f16.bin")),
                 "--license-manifest",
                 str(_manifest(root / "license-manifest.json")),
                 "--output-dir",
@@ -74,9 +74,11 @@ class PrepareReleaseSidecarsTest(unittest.TestCase):
             self.assertTrue((out / "bin/ffmpeg").exists())
             self.assertTrue((out / "bin/ffprobe").exists())
             self.assertTrue((out / "bin/whisper-cli").exists())
-            self.assertTrue((out / "bin/demucs.cpp").exists())
+            self.assertTrue((out / "bin/demucs.cpp.main").exists())
             self.assertTrue((out / "models/ggml-small.en.bin").exists())
-            self.assertTrue((out / "models/ggml-model-htdemucs").is_dir())
+            self.assertTrue(
+                (out / "models/ggml-model-htdemucs-4s-f16.bin").exists()
+            )
             self.assertTrue((out / "data/cmudict.dict").exists())
             manifest = json.loads((out / "sidecar-manifest.json").read_text())
             self.assertEqual(1, manifest["schemaVersion"])
@@ -98,12 +100,6 @@ def _fake_executable(path, output):
 
 def _file(path):
     path.write_bytes(b"fixture")
-    return path
-
-
-def _dir(path):
-    path.mkdir()
-    (path / "model.bin").write_bytes(b"fixture")
     return path
 
 

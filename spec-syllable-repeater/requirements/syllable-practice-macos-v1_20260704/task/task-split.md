@@ -50,7 +50,7 @@
 
 - [ ] 2.1 整備 x86_64 sidecar 二進位：FFmpeg（**LGPL build、動態連結**）、whisper.cpp、demucs.cpp，置於 `Contents/Resources/sidecar/`，附授權清單檔
   【`[需要回報]`（授權合規須回報核對）｜Non-scope：不編 Apple Silicon 版｜驗證：AT-09-05 / CT-09 授權掃描；FFmpeg 為 LGPL 動態連結】
-  - **進度註記（2026-07-07）**：release sidecar staging gate 已落地但實體 bundle 尚未完成：新增 `SidecarPaths.bundled/current()`，Release AOT 走 `Contents/Resources/sidecar/`，Debug/Test 維持 `.local-tools/`；新增 `scripts/prepare_release_sidecars.py` 與 `scripts/test_prepare_release_sidecars.py`，staging 前跑 CT-09 license manifest gate，拒絕 `--enable-gpl` / `--enable-nonfree` 或非 shared FFmpeg；新增 macOS Release build phase `copy_release_sidecars.sh`，缺 `sidecar-manifest.json`、ffmpeg/ffprobe/whisper/demucs/model/cmudict 即中止 release build。本機 `/usr/local/bin/ffmpeg` 為 `--enable-gpl` dev-only，且 `.local-tools/demucs.cpp` 二進位/模型不存在，因此 2.1 不勾完成，等待 LGPL-only FFmpeg + demucs.cpp artifacts 後重跑 staging。
+  - **進度註記（2026-07-07）**：release sidecar staging gate 已落地但實體 bundle 尚未完成：新增 `SidecarPaths.bundled/current()`，Release AOT 走 `Contents/Resources/sidecar/`，Debug/Test 維持 `.local-tools/`；新增 `scripts/prepare_release_sidecars.py` 與 `scripts/test_prepare_release_sidecars.py`，staging 前跑 CT-09 license manifest gate，拒絕 `--enable-gpl` / `--enable-nonfree` 或非 shared FFmpeg；新增 macOS Release build phase `copy_release_sidecars.sh`，缺 `sidecar-manifest.json`、ffmpeg/ffprobe/whisper/demucs/model/cmudict 即中止 release build。本機 `/usr/local/bin/ffmpeg` 為 `--enable-gpl` dev-only，且 `.local-tools/demucs.cpp` 二進位/模型不存在，因此 2.1 不勾完成，等待 LGPL-only FFmpeg + demucs.cpp artifacts 後重跑 staging。2026-07-07 後續校正：sevagh/demucs.cpp 官方 CLI 為 `demucs.cpp.main <model-file> <wav> <out-dir>`，adapter/staging path 改用 `demucs.cpp.main` 與 `ggml-model-htdemucs-4s-f16.bin`。
 - [x] 2.2 實作 SidecarRunner（`Process.start` 包裝：逾時預設 120s 可設定、exit code 邊界、stdout/stderr 收集、殺行程回收）
   【`[可直接做]`｜Non-scope：不含各 sidecar 的參數組裝（歸模組 3/4）｜驗證：CT-04 / AT-01-04 故障注入（kill -9 → App 不崩、階段結果保留）】
 - [x] 2.3 實作 FFmpeg 解碼契約（→16-bit/44.1kHz/mono PCM＋時長）與格式/長度前置驗證（mp3/wav/m4a/flac、≤10 分鐘）
@@ -77,7 +77,7 @@
   【**OQ-2 定案（2026-07-06）**：sevagh/demucs.cpp（MIT License, Copyright 2023 Sevag H；主依賴 Eigen MPL-2.0）通過 M9 授權白名單；使用者透過 hard-guardrails skill 的 WebFetch 核對 LICENSE 檔實際內容】
   【**產物**：`packages/infra/lib/src/sidecar/demucs_separator.dart` (`DemucsCppVocalSeparator implements AnalysisVocalSeparator`) ＋`test/demucs_separator_test.dart` 7 情境（含錯誤映射 + 成功路徑）＋`test/demucs_integration_test.dart` @Tags(['sidecar'])（skip if missing）＋app 端 `demucsReadyProvider` + UI 未就緒 tooltip 提示 3 情境測試】
   【**依賴注入**：`app/lib/shared/infra/infra_analysis_runner.dart` 依 `paths.demucsAvailable()` 條件性注入 `vocalSeparator`；未就緒時 pipeline 走 `if (vocalSeparator != null)` null 分支自動降級（backend-design §5 第 704 行、M4）】
-  【**使用者本機事宜**（本輪 Non-scope）：demucs.cpp 二進位 build 與 htdemucs 模型下載——待使用者本機準備後真整合測試自動變綠。實際 CLI 語法若與 `--two-stems=vocals -o <dir> --model-dir <dir> <input>` 不符，改 `demucs_separator.dart` 內 args 常數即可】
+  【**使用者本機事宜**（本輪 Non-scope）：demucs.cpp 二進位 build 與 htdemucs 模型下載——待使用者本機準備後真整合測試自動變綠。2026-07-07 已依 sevagh/demucs.cpp README 校正 CLI 為 `demucs.cpp.main <model-file> <input> <out-dir>`，vocals 輸出讀 `target_3_vocals.wav`】
 
 ## 4. PracticeEngine（介面 3–6；S2/S3；★TDD 先寫測試）
 

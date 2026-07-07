@@ -109,13 +109,13 @@ def _build_plan(args: argparse.Namespace) -> dict:
             _entry(
                 "demucs.cpp",
                 args.demucs_cli,
-                output_dir / "bin/demucs.cpp",
+                output_dir / "bin/demucs.cpp.main",
                 "bin",
             ),
             _entry(
                 "demucs-model",
                 args.demucs_model,
-                output_dir / "models/ggml-model-htdemucs",
+                output_dir / "models/ggml-model-htdemucs-4s-f16.bin",
                 "model",
             ),
         ],

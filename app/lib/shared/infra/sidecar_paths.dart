@@ -16,7 +16,7 @@ class SidecarPaths {
   final String whisperModelPath;
   final String cmudictPath;
   final String demucsCliPath;
-  final String demucsModelDir;
+  final String demucsModelPath;
   final String tempDirectory;
 
   const SidecarPaths({
@@ -26,7 +26,7 @@ class SidecarPaths {
     required this.whisperModelPath,
     required this.cmudictPath,
     required this.demucsCliPath,
-    required this.demucsModelDir,
+    required this.demucsModelPath,
     required this.tempDirectory,
   });
 
@@ -59,10 +59,12 @@ class SidecarPaths {
           env['CMUDICT_PATH'] ?? '$devRoot/.local-tools/cmudict/cmudict.dict',
       demucsCliPath:
           env['DEMUCS_CLI_PATH'] ??
-          '$devRoot/.local-tools/demucs.cpp/build/bin/demucs.cpp',
-      demucsModelDir:
+          '$devRoot/.local-tools/demucs.cpp/build/demucs.cpp.main',
+      demucsModelPath:
+          env['DEMUCS_MODEL_PATH'] ??
           env['DEMUCS_MODEL_DIR'] ??
-          '$devRoot/.local-tools/demucs.cpp/ggml-model-htdemucs',
+          '$devRoot/.local-tools/demucs.cpp/ggml-demucs/'
+              'ggml-model-htdemucs-4s-f16.bin',
       tempDirectory: tempDir,
     );
   }
@@ -88,8 +90,11 @@ class SidecarPaths {
       whisperCliPath: _join(sidecarRoot, 'bin/whisper-cli'),
       whisperModelPath: _join(sidecarRoot, 'models/ggml-small.en.bin'),
       cmudictPath: _join(sidecarRoot, 'data/cmudict.dict'),
-      demucsCliPath: _join(sidecarRoot, 'bin/demucs.cpp'),
-      demucsModelDir: _join(sidecarRoot, 'models/ggml-model-htdemucs'),
+      demucsCliPath: _join(sidecarRoot, 'bin/demucs.cpp.main'),
+      demucsModelPath: _join(
+        sidecarRoot,
+        'models/ggml-model-htdemucs-4s-f16.bin',
+      ),
       tempDirectory: tempDir,
     );
   }
@@ -115,12 +120,10 @@ class SidecarPaths {
     return missing;
   }
 
-  /// demucs.cpp 二進位與模型目錄是否就緒（選用，不阻斷 pipeline）。
+  /// demucs.cpp 二進位與模型檔是否就緒（選用，不阻斷 pipeline）。
   /// 未就緒時 pipeline 走 backend-design §5 第 704 行「跳過分離用原音」降級。
   bool demucsAvailable() =>
-      File(demucsCliPath).existsSync() &&
-      (Directory(demucsModelDir).existsSync() ||
-          File(demucsModelDir).existsSync());
+      File(demucsCliPath).existsSync() && File(demucsModelPath).existsSync();
 
   static String _defaultBundledResourcesRoot() {
     final executableDir = File(Platform.resolvedExecutable).parent;

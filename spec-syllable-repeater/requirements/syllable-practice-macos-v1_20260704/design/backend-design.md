@@ -386,7 +386,7 @@ sequenceDiagram
 | 提供方 | 呼叫形式 | 輸入 | 輸出 | 例外處理 |
 |--------|----------|------|------|----------|
 | FFmpeg | `ffmpeg -i <in> -f s16le -ar 44100 -ac 1 -` | 音檔路徑 | stdout PCM（16-bit/44.1kHz/mono）＋時長 | exit≠0 或逾時（可設定，預設 120s）→`SidecarFailure`；**保留已完成階段結果**（M4） |
-| demucs.cpp | `demucs --two-stems=vocals <wav>` | 解碼後 wav | vocals.wav / instrumental.wav | 同上；失敗可跳過分離改用原音（降級） |
+| demucs.cpp | `demucs.cpp.main <model-file> <wav> <out-dir>` | 解碼後 wav | `target_3_vocals.wav` | 同上；失敗可跳過分離改用原音（降級） |
 | whisper.cpp | `whisper -m <model> -oj <wav>` | wav（＋可選字稿走對齊模式） | 詞級時間戳 JSON | 同上；`kill -9` 場景＝AT-01-04 |
 
 **冪等**：系統冪等＝分析中鎖定重入（同一 `audioPath` 進行中拒絕第二次，AT-01-05）；業務冪等＝無（重跑分析覆蓋草稿）。

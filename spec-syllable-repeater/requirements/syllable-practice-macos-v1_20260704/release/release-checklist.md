@@ -17,7 +17,7 @@
 
 - 先用 `scripts/prepare_release_sidecars.py` 產生 `app/macos/Runner/Resources/sidecar/` staging 內容；實際 binaries/models/dictionaries 由 `.gitignore` 擋住，不進版控。
 - `prepare_release_sidecars.py` 會先跑 CT-09 license manifest gate，再拒絕 `--enable-gpl` / `--enable-nonfree` 或非 shared 的 FFmpeg/ffprobe。
-- macOS Release build phase 會檢查 `sidecar-manifest.json`、`bin/ffmpeg`、`bin/ffprobe`、`bin/whisper-cli`、`bin/demucs.cpp`、`models/ggml-small.en.bin`、`models/ggml-model-htdemucs`、`data/cmudict.dict`，缺任一項即中止 release build。
+- macOS Release build phase 會檢查 `sidecar-manifest.json`、`bin/ffmpeg`、`bin/ffprobe`、`bin/whisper-cli`、`bin/demucs.cpp.main`、`models/ggml-small.en.bin`、`models/ggml-model-htdemucs-4s-f16.bin`、`data/cmudict.dict`，缺任一項即中止 release build。
 
 ## CT-09 人工核對
 
