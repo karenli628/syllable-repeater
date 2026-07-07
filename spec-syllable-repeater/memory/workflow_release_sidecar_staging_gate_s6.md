@@ -1,6 +1,6 @@
 # workflow_release_sidecar_staging_gate_s6
 
-source: syllable-repeater / fullstack-code-implementation S6-14 task 2.1
+source: syllable-repeater / fullstack-code-implementation S6-14 task 2.1; commit `044772f`; GitHub Actions Core CI run `28835738044` passed.
 
 context: 2.1 要把 x86_64 sidecar 放進 macOS App bundle `Contents/Resources/sidecar/`，但現有 `/usr/local/bin/ffmpeg` 是 Homebrew GPL build（`--enable-gpl`），且 `.local-tools/demucs.cpp` binary/model 尚未就緒。不能為了 release build 把 GPL FFmpeg 或缺件 silently 放進 bundle。
 

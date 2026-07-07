@@ -6,6 +6,8 @@
 
 - 已提交並推送 8.2/8.3 commit：`4127816 chore: record core CI and Q10 benchmark`。
 - GitHub Actions Core CI run `28835057771` 於 commit `4127816` 通過，job `CT-01..CT-10 and guardrails` 耗時 2m1s。
+- 已提交並推送 2.1 release sidecar staging gate commit：`044772f chore: add release sidecar staging gate`。
+- GitHub Actions Core CI run `28835738044` 於 commit `044772f` 通過，job `CT-01..CT-10 and guardrails` 耗時 3m1s。
 - 2.1 已完成可落地防線：
   - `SidecarPaths.current()` / `SidecarPaths.bundled()`：Release AOT 走 `Contents/Resources/sidecar/`；Debug/Test 走 `.local-tools/`。
   - `scripts/prepare_release_sidecars.py`：staging 前跑 CT-09 license gate，拒絕 GPL/nonfree 或非 shared FFmpeg/ffprobe，產出 `sidecar-manifest.json`。
@@ -21,6 +23,7 @@
 - `flutter test app/test/shared/sidecar_paths_test.dart` ✅
 - `python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機 artifact 狀態正確失敗：`.local-tools/demucs.cpp/build/bin/demucs.cpp` 與 `ggml-model-htdemucs` 不存在。
 - `/usr/local/bin/ffmpeg -version` 顯示 `--enable-gpl`，此 Homebrew build 只能 dev-only，不可 release bundled。
+- `bash scripts/ci_core_checks.sh` 本機通過；推送後遠端 Core CI run `28835738044` 也通過。
 
 ## 目前 2.1 狀態
 

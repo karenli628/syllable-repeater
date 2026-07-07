@@ -745,6 +745,8 @@
   - `python3 scripts/check_licenses.py .../release/license-manifest.json` ✅（19 components）
   - `python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py` ✅（8 tests）
   - `flutter test app/test/shared/sidecar_paths_test.dart` ✅
+  - `bash scripts/ci_core_checks.sh` ✅（本機完整 Core CI）
+  - GitHub Actions Core CI run `28835738044` ✅（commit `044772f chore: add release sidecar staging gate`，job `CT-01..CT-10 and guardrails` 3m1s）
   - 實際 dry-run：`python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機狀態正確失敗，因 `.local-tools/demucs.cpp/build/bin/demucs.cpp` 與 `ggml-model-htdemucs` 不存在；另 `/usr/local/bin/ffmpeg -version` 顯示 `--enable-gpl`，只能作 dev-only，不得進 release bundle。
 - **結論**：2.1 的可程式化防線已落地；實體 x86_64 sidecar bundle 必須等 LGPL-only FFmpeg/ffprobe（dynamic/shared）與 demucs.cpp binary/model artifacts 就緒後再跑 staging，屆時才能勾選 2.1 完成並進入 9.1 release build。
 
