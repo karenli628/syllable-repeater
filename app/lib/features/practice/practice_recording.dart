@@ -10,7 +10,7 @@ import 'package:record/record.dart';
 import '../../shared/infra/sidecar_paths.dart';
 
 final practiceRecorderProvider = Provider<PracticeRecorder>((ref) {
-  final paths = SidecarPaths.dev();
+  final paths = SidecarPaths.current();
   final recorder = RecordPracticeRecorder(tempDirectory: paths.tempDirectory);
   ref.onDispose(recorder.dispose);
   return recorder;
@@ -19,7 +19,7 @@ final practiceRecorderProvider = Provider<PracticeRecorder>((ref) {
 final practiceComparisonServiceProvider = Provider<PracticeComparisonService>((
   ref,
 ) {
-  final paths = SidecarPaths.dev();
+  final paths = SidecarPaths.current();
   return DomainPracticeComparisonService(
     comparator: RecordingComparator(
       audioSource: FileRecordingAudioSource(

@@ -159,6 +159,16 @@
       "source": "https://github.com/ggerganov/whisper.cpp"
     },
     {
+      "name": "OpenAI Whisper small.en model",
+      "category": "model",
+      "license": "MIT",
+      "distribution": "bundled",
+      "language": "n/a",
+      "linking": "n/a",
+      "source": "https://github.com/openai/whisper",
+      "notes": "OpenAI Whisper README states code and model weights are released under the MIT License; bundled file is ggml-small.en.bin converted for whisper.cpp."
+    },
+    {
       "name": "demucs.cpp",
       "category": "sidecar",
       "license": "MIT",

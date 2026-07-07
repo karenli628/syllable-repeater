@@ -17,7 +17,7 @@ final lessonPackFilePickerProvider = Provider<LessonPackFilePicker>(
 );
 
 final lessonPackServiceProvider = Provider<LessonPackService>((ref) {
-  final paths = SidecarPaths.dev();
+  final paths = SidecarPaths.current();
   return AppLessonPackService(
     db: ref.watch(appDatabaseProvider),
     engine: LessonPackEngine(

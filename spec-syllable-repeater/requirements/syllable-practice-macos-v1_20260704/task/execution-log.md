@@ -729,6 +729,25 @@
 - **結果**：`audioDurationMs=10000`、`elapsedMs=4689`（4.689s）、`syllableCount=22`、`waveformPeaks=32`、`targetSeconds=60`、`status=PASS`。
 - **規格更新**：`requirement.md` v1.3、REQ-01 3.2.6 與附錄 A Q10 改為「10 秒音檔完整對齊管線 ≤ 60 秒」已實測鎖定；`backend-design.md` 目標與風險段落同步，未來更換模型/晶片/sidecar 版本需重跑 benchmark。
 
+## Task S6-14（2.1 release sidecar staging gate）— 2026-07-07
+
+### x86_64 sidecar release bundle 前置防線
+- **狀態**：Partial（release sidecar 路徑、staging 腳本、build fail-closed gate 已落地；實體 bundle 待 LGPL-only FFmpeg 與 demucs.cpp artifacts）
+- **產物（新增/修改）**：
+  - `app/lib/shared/infra/sidecar_paths.dart`：新增 `SidecarPaths.current()` 與 `SidecarPaths.bundled()`；Release AOT 走 `Contents/Resources/sidecar/`，Debug/Test 維持 `.local-tools/`。
+  - `app/lib/main.dart`、`lesson_pack_service.dart`、`progress_service.dart`、`export_dialog.dart`、`practice_recording.dart`：改用 `SidecarPaths.current()`。
+  - `scripts/prepare_release_sidecars.py`：staging 前先跑 CT-09 license manifest gate；拒絕 `--enable-gpl` / `--enable-nonfree` 或非 shared FFmpeg/ffprobe；產出 `sidecar-manifest.json`；copy whisper/demucs/FFmpeg dylibs 並修正 Mach-O rpath。
+  - `scripts/test_prepare_release_sidecars.py`：覆蓋 GPL FFmpeg 被拒絕、合法 fake bundle 產出 release layout。
+  - `app/macos/Runner/Scripts/copy_release_sidecars.sh` + Xcode build phase：Release build 檢查 staging 內容，缺任一必要 sidecar/model/data 即中止；Debug/Profile 跳過。
+  - `app/macos/Runner/Resources/sidecar/README.md` / `.gitignore`：說明 staging 指令，實際 binaries/models/dictionaries 不進版控。
+  - `license-manifest.json`：補 `OpenAI Whisper small.en model`（MIT，官方 Whisper README 明示 code 與 model weights 皆 MIT）。
+- **實測結果**：
+  - `python3 scripts/check_licenses.py .../release/license-manifest.json` ✅（19 components）
+  - `python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py` ✅（8 tests）
+  - `flutter test app/test/shared/sidecar_paths_test.dart` ✅
+  - 實際 dry-run：`python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機狀態正確失敗，因 `.local-tools/demucs.cpp/build/bin/demucs.cpp` 與 `ggml-model-htdemucs` 不存在；另 `/usr/local/bin/ffmpeg -version` 顯示 `--enable-gpl`，只能作 dev-only，不得進 release bundle。
+- **結論**：2.1 的可程式化防線已落地；實體 x86_64 sidecar bundle 必須等 LGPL-only FFmpeg/ffprobe（dynamic/shared）與 demucs.cpp binary/model artifacts 就緒後再跑 staging，屆時才能勾選 2.1 完成並進入 9.1 release build。
+
 ## e2e 驗收紀錄 — S1a Frontend FP2
 
 - **前置**：使用者裝完整 Xcode 15.4 + CocoaPods；`flutter build macos --debug` ✅（首次 pod install 成功，產物：`app/build/macos/Build/Products/Debug/syllable_repeater_app.app`）。

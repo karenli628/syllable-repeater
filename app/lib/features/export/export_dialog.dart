@@ -13,7 +13,7 @@ import '../../shared/infra/sidecar_paths.dart';
 import '../../shared/tokens.dart';
 
 final practiceExportServiceProvider = Provider<PracticeExportService>((ref) {
-  final paths = SidecarPaths.dev();
+  final paths = SidecarPaths.current();
   return InfraPracticeExportService(
     PracticeExporter(
       engine: PracticeEngine(),

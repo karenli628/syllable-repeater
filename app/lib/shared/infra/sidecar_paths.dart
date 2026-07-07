@@ -30,25 +30,66 @@ class SidecarPaths {
     required this.tempDirectory,
   });
 
+  /// App 預設 sidecar 來源：Release/App Store-like AOT 使用 bundle 內資源；
+  /// 開發與 widget test 仍使用 `.local-tools/`。
+  factory SidecarPaths.current() {
+    if (const bool.fromEnvironment('dart.vm.product')) {
+      return SidecarPaths.bundled();
+    }
+    return SidecarPaths.dev();
+  }
+
   /// 開發期預設：`.local-tools/` 布局；env var 可覆寫個別路徑。
   factory SidecarPaths.dev() {
     final env = Platform.environment;
     final devRoot = env['SYLLABLE_REPEATER_DEV_ROOT'] ?? _defaultDevRoot;
-    final tempDir = env['SYLLABLE_REPEATER_TEMP_DIR'] ??
+    final tempDir =
+        env['SYLLABLE_REPEATER_TEMP_DIR'] ??
         '${Directory.systemTemp.path}/syllable_repeater';
     return SidecarPaths(
       ffmpegPath: env['FFMPEG_PATH'] ?? '/usr/local/bin/ffmpeg',
       ffprobePath: env['FFPROBE_PATH'] ?? '/usr/local/bin/ffprobe',
-      whisperCliPath: env['WHISPER_CLI_PATH'] ??
+      whisperCliPath:
+          env['WHISPER_CLI_PATH'] ??
           '$devRoot/.local-tools/whisper.cpp/build/bin/whisper-cli',
-      whisperModelPath: env['WHISPER_MODEL_PATH'] ??
+      whisperModelPath:
+          env['WHISPER_MODEL_PATH'] ??
           '$devRoot/.local-tools/whisper.cpp/models/ggml-small.en.bin',
-      cmudictPath: env['CMUDICT_PATH'] ??
-          '$devRoot/.local-tools/cmudict/cmudict.dict',
-      demucsCliPath: env['DEMUCS_CLI_PATH'] ??
+      cmudictPath:
+          env['CMUDICT_PATH'] ?? '$devRoot/.local-tools/cmudict/cmudict.dict',
+      demucsCliPath:
+          env['DEMUCS_CLI_PATH'] ??
           '$devRoot/.local-tools/demucs.cpp/build/bin/demucs.cpp',
-      demucsModelDir: env['DEMUCS_MODEL_DIR'] ??
+      demucsModelDir:
+          env['DEMUCS_MODEL_DIR'] ??
           '$devRoot/.local-tools/demucs.cpp/ggml-model-htdemucs',
+      tempDirectory: tempDir,
+    );
+  }
+
+  /// 發布期預設：App bundle `Contents/Resources/sidecar/` 布局。
+  ///
+  /// 2.1 / M9 要求 release sidecar 由 `scripts/prepare_release_sidecars.py`
+  /// 產生，並由 macOS build phase 複製到 bundle resources。
+  factory SidecarPaths.bundled({String? resourcesRoot}) {
+    final env = Platform.environment;
+    final root =
+        env['SYLLABLE_REPEATER_RESOURCES_DIR'] ??
+        resourcesRoot ??
+        _defaultBundledResourcesRoot();
+    final sidecarRoot =
+        env['SYLLABLE_REPEATER_SIDECAR_DIR'] ?? _join(root, 'sidecar');
+    final tempDir =
+        env['SYLLABLE_REPEATER_TEMP_DIR'] ??
+        '${Directory.systemTemp.path}/syllable_repeater';
+    return SidecarPaths(
+      ffmpegPath: _join(sidecarRoot, 'bin/ffmpeg'),
+      ffprobePath: _join(sidecarRoot, 'bin/ffprobe'),
+      whisperCliPath: _join(sidecarRoot, 'bin/whisper-cli'),
+      whisperModelPath: _join(sidecarRoot, 'models/ggml-small.en.bin'),
+      cmudictPath: _join(sidecarRoot, 'data/cmudict.dict'),
+      demucsCliPath: _join(sidecarRoot, 'bin/demucs.cpp'),
+      demucsModelDir: _join(sidecarRoot, 'models/ggml-model-htdemucs'),
       tempDirectory: tempDir,
     );
   }
@@ -80,4 +121,16 @@ class SidecarPaths {
       File(demucsCliPath).existsSync() &&
       (Directory(demucsModelDir).existsSync() ||
           File(demucsModelDir).existsSync());
+
+  static String _defaultBundledResourcesRoot() {
+    final executableDir = File(Platform.resolvedExecutable).parent;
+    return _join(executableDir.parent.path, 'Resources');
+  }
+
+  static String _join(String base, String child) {
+    final normalizedBase = base.endsWith(Platform.pathSeparator)
+        ? base.substring(0, base.length - 1)
+        : base;
+    return '$normalizedBase${Platform.pathSeparator}$child';
+  }
 }

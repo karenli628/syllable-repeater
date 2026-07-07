@@ -24,7 +24,7 @@ python3 scripts/check_guardrails.py "$MATRIX" "$DECISION_LOG"
 
 section "CT-09 license gate"
 python3 scripts/check_licenses.py "$LICENSE_MANIFEST"
-python3 -m unittest scripts/test_check_licenses.py
+python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py
 
 section "CT-01..CT-10 domain tests"
 flutter test packages/domain/test

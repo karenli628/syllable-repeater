@@ -22,7 +22,7 @@ final progressRepositoryProvider = Provider<ProgressRepository>((ref) {
 
 final progressServiceProvider = Provider<ProgressService>((ref) {
   final repository = ref.watch(progressRepositoryProvider);
-  final paths = SidecarPaths.dev();
+  final paths = SidecarPaths.current();
   return DomainProgressService(
     repository,
     ProgressEngine(

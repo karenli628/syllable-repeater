@@ -50,6 +50,7 @@
 
 - [ ] 2.1 整備 x86_64 sidecar 二進位：FFmpeg（**LGPL build、動態連結**）、whisper.cpp、demucs.cpp，置於 `Contents/Resources/sidecar/`，附授權清單檔
   【`[需要回報]`（授權合規須回報核對）｜Non-scope：不編 Apple Silicon 版｜驗證：AT-09-05 / CT-09 授權掃描；FFmpeg 為 LGPL 動態連結】
+  - **進度註記（2026-07-07）**：release sidecar staging gate 已落地但實體 bundle 尚未完成：新增 `SidecarPaths.bundled/current()`，Release AOT 走 `Contents/Resources/sidecar/`，Debug/Test 維持 `.local-tools/`；新增 `scripts/prepare_release_sidecars.py` 與 `scripts/test_prepare_release_sidecars.py`，staging 前跑 CT-09 license manifest gate，拒絕 `--enable-gpl` / `--enable-nonfree` 或非 shared FFmpeg；新增 macOS Release build phase `copy_release_sidecars.sh`，缺 `sidecar-manifest.json`、ffmpeg/ffprobe/whisper/demucs/model/cmudict 即中止 release build。本機 `/usr/local/bin/ffmpeg` 為 `--enable-gpl` dev-only，且 `.local-tools/demucs.cpp` 二進位/模型不存在，因此 2.1 不勾完成，等待 LGPL-only FFmpeg + demucs.cpp artifacts 後重跑 staging。
 - [x] 2.2 實作 SidecarRunner（`Process.start` 包裝：逾時預設 120s 可設定、exit code 邊界、stdout/stderr 收集、殺行程回收）
   【`[可直接做]`｜Non-scope：不含各 sidecar 的參數組裝（歸模組 3/4）｜驗證：CT-04 / AT-01-04 故障注入（kill -9 → App 不崩、階段結果保留）】
 - [x] 2.3 實作 FFmpeg 解碼契約（→16-bit/44.1kHz/mono PCM＋時長）與格式/長度前置驗證（mp3/wav/m4a/flac、≤10 分鐘）
