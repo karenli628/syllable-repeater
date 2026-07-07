@@ -695,7 +695,7 @@
 
 - 授權 manifest 檢查：`python3 scripts/check_licenses.py spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/release/license-manifest.json` ✅（18 components）
 - 授權 gate 測試：`python3 -m unittest scripts/test_check_licenses.py` **6/6 ✅**
-- **結論：本機 CT-09 授權掃描 gate 已落地**。8.2 整體仍未勾選完成，因 CT-01～CT-10 常駐遠端 CI、#9 Branch Protection 與 release 實機 gate 仍待最後階段。
+- **結論：本機 CT-09 授權掃描 gate 已落地**。當時 8.2 整體尚未勾選完成，因 CT-01～CT-10 常駐遠端 CI、#9 Branch Protection 與 release 實機 gate 仍待最後階段；後續見 S6-11/S6-12。
 
 ## Task S6-11（#9 Branch Protection + GitHub upload gate）— 2026-07-07
 
@@ -705,6 +705,29 @@
 - **Repository**：依使用者指定 `syllable repeater` 正規化為 GitHub slug `syllable-repeater`；建立網址 `https://github.com/karenli628/syllable-repeater`。初始建立為 private；GitHub API 建立 private ruleset 回 403（需 GitHub Pro 或 public repository），使用者授權後已改為 public。
 - **Branch Protection**：Repository Ruleset `main branch protection`（id `18580116`）建立成功：`enforcement=active`、`target=branch`、include `refs/heads/main`、rules `deletion` + `non_fast_forward`。依上傳限制未執行 `git push --force` 或 `--force-with-lease` 測試。
 - **Guardrails 更新**：`hard-limits-matrix.md` #9 由 `REJECTED_NEEDS_IMPLEMENTATION` 轉 `IMPLEMENTED`；狀態統計改為 `IMPLEMENTED=7`、`PARTIAL=20`、`REJECTED_NEEDS_IMPLEMENTATION=0`。
+
+## Task S6-12（8.2 GitHub Actions core CI gate）— 2026-07-07
+
+### CT-01～CT-10 常駐 CI
+- **狀態**：Done（8.2 勾選完成；GitHub Actions 遠端 gate 已通過）
+- **產物（新增）**：
+  - `.github/workflows/ci.yml`：push/PR 觸發，runner 固定 `macos-15`，使用 Flutter `3.44.4`、`actions/checkout@v7`、`actions/setup-python@v6`、`subosito/flutter-action@v2`。
+  - `scripts/ci_core_checks.sh`：集中跑 `flutter pub get`、`scripts/check_guardrails.py`、`scripts/check_licenses.py`、`python3 -m unittest scripts/test_check_licenses.py`、`flutter test packages/domain/test`、`flutter test packages/infra/test`、`cd app && flutter test`、`flutter analyze`。
+- **實作重點**：8.2 只接「核心驗收總表測試常駐 CI」；release 實機 gate（9.1/9.2）仍不假完成。GitHub Actions 初版 `macos-latest` 成功後，因 GitHub annotations 提醒 Node 20 與 macOS latest migration，改 pin `macos-15` 並升級 checkout/setup-python。
+- **本地驗證**：`bash scripts/ci_core_checks.sh` ✅；guardrails checker 通過（37 rows，`REJECTED_NEEDS_IMPLEMENTATION=0`）、license gate 通過（18 components）、domain 82/82、infra 67/67、app 58/58、`flutter analyze` No issues。
+- **遠端驗證**：GitHub Actions run `28808859106`（commit `62a0695`）✅，2m11s 通過；run URL：`https://github.com/karenli628/syllable-repeater/actions/runs/28808859106`。
+- **Guardrails 更新**：`hard-limits-matrix.md` #8 CI 由 `PARTIAL` 轉 `IMPLEMENTED`；統計改為 `IMPLEMENTED=8`、`PARTIAL=19`。
+
+## Task S6-13（8.3 Q10 performance benchmark）— 2026-07-07
+
+### 10 秒音檔完整對齊管線 i5-8259U 實測
+- **狀態**：Done（8.3 勾選完成；Q10 目標數值回填 requirement/backend-design）
+- **產物（新增）**：
+  - `packages/infra/bin/benchmark_alignment_pipeline.dart`：用使用者提供 mp3 產生 10,000ms benchmark WAV，量測完整 `AnalysisPipeline`：FFmpeg decode → whisper.cpp small.en `--no-gpu` → CMUdict syllabify → waveform peaks。
+- **實測環境**：`Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz`；FFmpeg 路徑 `/usr/local/bin/ffmpeg`；whisper.cpp small.en 與 CMUdict 走 `.local-tools/`。
+- **實測指令**：`(cd packages/infra && dart run bin/benchmark_alignment_pipeline.dart)`。
+- **結果**：`audioDurationMs=10000`、`elapsedMs=4689`（4.689s）、`syllableCount=22`、`waveformPeaks=32`、`targetSeconds=60`、`status=PASS`。
+- **規格更新**：`requirement.md` v1.3、REQ-01 3.2.6 與附錄 A Q10 改為「10 秒音檔完整對齊管線 ≤ 60 秒」已實測鎖定；`backend-design.md` 目標與風險段落同步，未來更換模型/晶片/sidecar 版本需重跑 benchmark。
 
 ## e2e 驗收紀錄 — S1a Frontend FP2
 

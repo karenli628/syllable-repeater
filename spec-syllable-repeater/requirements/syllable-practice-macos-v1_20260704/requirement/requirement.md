@@ -20,6 +20,7 @@
 | 1.0 | 2026-07-04 | AI（依 PLAN3.0 整理） | — | — | 初稿。三項關鍵調整：① 平台順序由「Windows v1、macOS 後」改為 **macOS v1 優先**；② 新增手機端未來兼容約束（PWA 或 App Store/Play Store 原生 App 雙路徑保留）；③ 金標準例句 `She has excellent communication skills` 音節數由 PLAN3.0 原文之 15 **修正為 11**（she 1 + has 1 + ex·cel·lent 3 + com·mu·ni·ca·tion 5 + skills 1 = 11 音節 → 10 切點 → 11 步），使用者於 2026-07-04 明示修正，全文以 11 為準 |
 | 1.1 | 2026-07-04 | AI | 2026-07-04 | Karen（需求方） | 使用者核可附錄 A 全部 10 題，以各題「建議預設」為定案值（Q9、Q10 維持待實測/待產品定，見附錄 A 註記）；成稿定稿，交付 fullstack-design |
 | 1.2 | 2026-07-04 | AI | 2026-07-04 | Karen（需求方） | S8/REQ-09 簽章計畫由「Developer ID 簽章＋notarization」改為「v1 免簽章＋使用者自行略過 Gatekeeper」；原因：使用者無 Apple Developer 帳號。使用者於四個選項（免簽章略過 Gatekeeper／免費 Apple ID Personal Team ad-hoc 簽章／桌面版走 Flutter Web PWA／延後至取得帳號後再付費申請）中選定「免簽章＋略過 Gatekeeper」 |
+| 1.3 | 2026-07-07 | AI | — | — | Q10 效能目標完成 i5-8259U 實測：10,000ms benchmark 音檔完整對齊管線 4.689s 通過，目標鎖定為 ≤60s |
 
 > 數據修正留痕（憲法 C3）：PLAN3.0 §3.3、S1a、§6、§7 原文寫「15 音節/15 步/14 切點」，經逐字核對音節拆分後確認原文有誤，以使用者修正值 11 音節/11 步/10 切點取代。
 
@@ -215,7 +216,7 @@ flowchart TD
 
 | 類別 | 指標/描述 | 實作要求 | 驗收方式 |
 |------|-----------|----------|----------|
-| 效能 | 10 秒內音檔的完整對齊管線 ≤ 60 秒（基準機＝Intel i5-8259U；S1a 實測後鎖定） | sidecar 逾時上限可設定 | 碼表實測 |
+| 效能 | 10 秒內音檔的完整對齊管線 ≤ 60 秒（基準機＝Intel i5-8259U；2026-07-07 實測 10,000ms 音檔＝4.689s，Q10 鎖定） | sidecar 逾時上限可設定 | `packages/infra/bin/benchmark_alignment_pipeline.dart` 碼表實測 |
 | 穩定性 | sidecar 崩潰不拖垮 App（M4） | `Process.start` 隔離、exit code 邊界處理 | kill -9 sidecar 故障注入 |
 
 #### 3.2.7 驗收測試情境
@@ -922,7 +923,7 @@ flowchart LR
 
 ## 附錄 A：待澄清清單（已核可定案，2026-07-04）
 
-> 使用者於 2026-07-04 核可：Q1–Q8 以「建議預設」為**定案值**；Q9 暫以下表預設進設計、允許使用者於設定中調整；Q10 於 S1a 實測後鎖定數值。
+> 使用者於 2026-07-04 核可：Q1–Q8 以「建議預設」為**定案值**；Q9 暫以下表預設進設計、允許使用者於設定中調整；Q10 已於 2026-07-07 依 S6-13 實測鎖定。
 
 | 編號 | 問題 | 影響範圍 | 定案值 |
 |------|------|----------|--------------------------|
@@ -935,7 +936,7 @@ flowchart LR
 | Q7 | 歸檔「不滿 7 日」計法 | REQ-08 M8、CT-08 | **定案**：168 小時（不含），CT-08 兩側測試以 167h/169h 為準 |
 | Q8 | 支援音檔格式與單檔長度上限 | REQ-01 | **定案**：mp3/wav/m4a/flac；上限 10 分鐘 |
 | Q9 | 提醒三參數預設值 | REQ-08 | 暫定：每次 15 分鐘／未達標上限 5 個／每日 2 次，**均為可調設定項**，非硬編碼 |
-| Q10 | 對齊管線效能目標 | REQ-01 3.2.6 | 暫以「10 秒音檔 ≤ 60 秒（基準機＝Intel i5-8259U）」為設計目標，S1a 實測後鎖定；Intel 上 whisper/demucs 較慢，此目標偏緊，實測不過則調整數值而非換演算法 |
+| Q10 | 對齊管線效能目標 | REQ-01 3.2.6 | **定案**：10 秒音檔完整對齊管線 ≤ 60 秒（基準機＝Intel i5-8259U）。2026-07-07 以 `packages/infra/bin/benchmark_alignment_pipeline.dart` 實測 10,000ms benchmark WAV，FFmpeg decode → whisper.cpp small.en `--no-gpu` → CMUdict syllabify → waveform peaks 共 4.689s，通過；若未來更換模型/晶片/sidecar 版本需重新實測 |
 
 ## 附錄 B：審查參與人建議
 

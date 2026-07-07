@@ -2,7 +2,7 @@
 
 > 本專案為**純本機、單人、無獨立後端**之桌面應用，依 fullstack-design「無伺服器端專案簡化路徑」撰寫：聚焦資料模型、核心規則防線（逐條對應需求成稿 2.5 M1–M10）、本機儲存與備份設計。**「後端」在本專案 = Domain Layer（純 Dart 領域層）**；「對外介面」= Domain 公開 API（無 HTTP 介面），為前端設計（frontend-design.md）的唯一權威契約來源。
 >
-> 主需求（唯一指定）：`spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/requirement/requirement.md`（v1.1，附錄 A 十題已定案）。
+> 主需求（唯一指定）：`spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/requirement/requirement.md`（v1.3，附錄 A 十題已定案；Q10 已於 2026-07-07 實測鎖定）。
 
 ---
 
@@ -23,7 +23,7 @@
 ### 1.2 目標
 
 1. **功能目標**：實作 REQ-01～REQ-09 全部 P0/P1 需求項（見需求成稿 2.1）。
-2. **效能目標**：10 秒音檔完整對齊管線 ≤ 60 秒（基準機 Intel i5-8259U，S1a 實測後鎖定，Q10）；播放啟動 ≤ 300ms；錄音停止→疊圖 ≤ 2 秒。
+2. **效能目標**：10 秒音檔完整對齊管線 ≤ 60 秒（基準機 Intel i5-8259U；2026-07-07 實測 10,000ms 音檔＝4.689s，Q10 已鎖定）；播放啟動 ≤ 300ms；錄音停止→疊圖 ≤ 2 秒。
 3. **品質目標**：M1–M10 核心維持原則零違反（§4.4 防線對照表）；Domain Layer 單元測試涵蓋全部公開行為（需求成稿 §6 對應）；資料寫入中斷不損毀既有資料。
 4. **業務目標**：金標準例句 `She has excellent communication skills`＝**11 音節→10 切點→11 步**全鏈路通過（需求成稿末章 CT-01/CT-02）。
 
@@ -751,7 +751,7 @@ sequenceDiagram
 
 ### 5.1 技術風險
 
-1. **Intel 效能風險**：whisper/demucs 在 i5-8259U 上偏慢，60 秒目標偏緊。**應對**：whisper 用 base/small 模型起步；demucs 設為可選勾選；階段化進度顯示；Q10 定案「實測不過調數字不換演算法」。
+1. **Intel 效能風險**：whisper/demucs 在 i5-8259U 上偏慢；Q10 已於 2026-07-07 用 10,000ms benchmark 音檔量測完整 `AnalysisPipeline`，small.en `--no-gpu` 路徑 4.689s 通過 60 秒目標。**應對**：whisper 用 small.en 模型起步；demucs 設為可選勾選；階段化進度顯示；未來更換模型/晶片/sidecar 版本需重跑 `packages/infra/bin/benchmark_alignment_pipeline.dart`。
 2. **whisper 時間戳精度風險**：詞邊界誤差影響切點聽感。**應對**：優先級明示「原聲＞切點準」（§0.1）；needsReview＋手動校正（REQ-02）兜底；MFA 外掛留作進階路徑。
 3. **demucs.cpp 成熟度風險**：C++ 移植版模型相容性待驗。**應對**：S1c 才接入；失敗可跳過分離（降級）；模型檔隨附版本鎖定。
 4. **YIN 強健性風險**：耳語/雜訊抽不到基頻。**應對**：pitchAvailable 降級設計（AT-05-02）；v1.5 評估 WORLD，介面已隔離。

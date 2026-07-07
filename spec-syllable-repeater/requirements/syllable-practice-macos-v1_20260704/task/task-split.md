@@ -140,11 +140,13 @@
 
 - [x] 8.1 建立 CI-ready 防線：domain 包於**無 Flutter 容器**跑 `dart test`＋依賴白名單檢查（禁 flutter/sidecar import）
   【`[可直接做]`｜Non-scope：不建立 GitHub Actions / 遠端 CI（待 git repo 決策後再接）｜驗證：CT-05、AT-09-01/02；落點：`packages/domain/test/domain_purity_test.dart`】
-- [ ] 8.2 集成核心驗收總表測試套件（CT-01～CT-10 逐條對應之自動化測試常駐 CI；CT-09 授權掃描腳本）
+- [x] 8.2 集成核心驗收總表測試套件（CT-01～CT-10 逐條對應之自動化測試常駐 CI；CT-09 授權掃描腳本）
   【`[可直接做]`｜Non-scope：CT-09 之人工簽核流程另列發版 checklist｜驗證：CI 綠＝2.5「必須維持」全數有測試（憲法 C10 三同步）】
-  - **進度註記（2026-07-06）**：CT-09 本機授權 gate 已落地：新增 `scripts/check_licenses.py`、`scripts/test_check_licenses.py`、`release/license-manifest.json` 與 `release/release-checklist.md`。腳本掃 release manifest，擋 GPL/AGPL/CC BY-NC/non-commercial/research-only、擋 bundled Python runtime，並要求 LGPL bundled 元件必須 dynamic linking；unittest 覆蓋 GPL/GPL-3.0 注入、LGPL static linking、bundled Python 與空 manifest。8.2 整體仍未勾選完成，因 CT-01～CT-10 常駐遠端 CI 尚待 GitHub repo/branch protection 最後 gate。
-- [ ] 8.3 效能基準測試：10 秒音檔對齊管線於 i5-8259U 實測，回填 Q10 目標數值
+  - **進度註記（2026-07-06）**：CT-09 本機授權 gate 已落地：新增 `scripts/check_licenses.py`、`scripts/test_check_licenses.py`、`release/license-manifest.json` 與 `release/release-checklist.md`。腳本掃 release manifest，擋 GPL/AGPL/CC BY-NC/non-commercial/research-only、擋 bundled Python runtime，並要求 LGPL bundled 元件必須 dynamic linking；unittest 覆蓋 GPL/GPL-3.0 注入、LGPL static linking、bundled Python 與空 manifest。當時 8.2 整體尚未勾選完成，因 CT-01～CT-10 常駐遠端 CI 尚待 GitHub repo/branch protection 最後 gate。
+  - **接續註記（2026-07-07）**：GitHub Actions 常駐 gate 已落地：`.github/workflows/ci.yml` 於 push/PR 跑 `scripts/ci_core_checks.sh`，涵蓋 guardrails checker、CT-09 license gate、license unittest、domain/infra/app 測試與 `flutter analyze`。遠端 run `28808859106`（commit `62a0695`）在 `macos-15` + Flutter `3.44.4` 通過。
+- [x] 8.3 效能基準測試：10 秒音檔對齊管線於 i5-8259U 實測，回填 Q10 目標數值
   【`[需要回報]`（實測結果決定是否調整 60s 目標）｜Non-scope：不換演算法（Q10 定案）｜驗證：REQ-01 3.2.6 效能列】
+  - **進度註記（2026-07-07）**：新增 `packages/infra/bin/benchmark_alignment_pipeline.dart`，以使用者提供 mp3 產生 10,000ms benchmark WAV 後量測完整 `AnalysisPipeline`（FFmpeg decode → whisper.cpp small.en `--no-gpu` → CMUdict syllabify → waveform peaks）。基準機 `Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz` 實測 `elapsedMs=4689`（4.689s）、`syllableCount=22`、`waveformPeaks=32`，Q10 目標鎖定為 10 秒音檔 ≤ 60 秒且本次通過。
 
 ### 8.4 硬性限制實作（2026-07-05 hard-guardrails skill 使用者裁決 REJECTED 之 5 條）
 
