@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>報告二：程式風格現況與後續工作守則 — Syllable Repeater</title>
+<style>
+  :root{
+    --ink:#1f2933; --sub:#52606d; --line:#e4e7eb; --bg:#f7f9fb; --card:#ffffff;
+    --blue:#3B6EF5; --amber:#E8A13C; --red:#D94F4F; --green:#2e8b57;
+  }
+  *{box-sizing:border-box}
+  body{font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg);margin:0;line-height:1.75}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 80px}
+  header{border-bottom:3px solid var(--blue);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:26px;margin:0 0 6px}
+  h2{font-size:20px;margin:40px 0 12px;padding-left:12px;border-left:4px solid var(--blue)}
+  h3{font-size:16px;margin:24px 0 8px}
+  .meta{color:var(--sub);font-size:13px}
+  .tldr{background:#eef3ff;border:1px solid #c9d8ff;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:15px}
+  .tldr strong{color:var(--blue)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;background:var(--card);font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#f0f4f8}
+  code,pre{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px}
+  code{background:#eef1f4;padding:1px 5px;border-radius:4px}
+  pre{background:#1f2933;color:#e4e7eb;padding:14px 16px;border-radius:8px;overflow-x:auto;line-height:1.6}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin:12px 0}
+  .sev{display:inline-block;border-radius:4px;padding:1px 8px;font-size:12px;font-weight:700;color:#fff}
+  .sev.imp{background:var(--amber)}
+  .sev.sug{background:#7b8794}
+  .sev.nit{background:#b3bcc7}
+  .sev.praise{background:var(--green)}
+  .ok{color:var(--green);font-weight:600}
+  .warn{color:var(--amber);font-weight:600}
+  .no{color:var(--red);font-weight:700}
+  .verdict{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+  .verdict .box{flex:1;min-width:130px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;text-align:center}
+  .verdict .num{font-size:28px;font-weight:800}
+  ol li,ul li{margin:6px 0}
+  .rule{background:#fff8ef;border:1px solid #f0d9b0;border-radius:8px;padding:14px 18px;margin:10px 0}
+  .rule b{color:#a06818}
+  .foot{margin-top:48px;color:var(--sub);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body><div class="wrap">
+
+<header>
+  <h1>報告二：程式風格現況、審查發現與後續工作守則</h1>
+  <div class="meta">專案：Syllable Repeater macOS v1 ｜ 審查基準：requirement v1.3／backend-design／frontend-design／coding-standard §6.5／cross-cutting CC-* ｜ 報告日期：2026-07-07</div>
+</header>
+
+<div class="tldr">
+  <strong>一句話結論：</strong>全庫風格<strong>高度一致、架構乾淨、效率無硬傷</strong>——審查結論 ✅ 透過（0 blocking／2 important／4 suggestion）；本報告把「已經自然形成的好風格」明文化成 12 條守則＋4 條紅線，後續所有工作（人或 AI agent）照守則走即可維持這個品質水位。
+</div>
+
+<h2>1. 審查結論與統計</h2>
+<div class="verdict">
+  <div class="box"><div class="num ok">✅</div>透過</div>
+  <div class="box"><div class="num">0</div>blocking</div>
+  <div class="box"><div class="num" style="color:var(--amber)">2</div>important</div>
+  <div class="box"><div class="num" style="color:#7b8794">4</div>suggestion</div>
+  <div class="box"><div class="num" style="color:#b3bcc7">1</div>nit</div>
+  <div class="box"><div class="num" style="color:var(--green)">7</div>praise</div>
+</div>
+<p>審查範圍：lib 82 個 dart 檔（深讀 Domain 全部引擎＋infra sidecar/DB＋app 組裝與核心控制器約 25 檔；其餘以全庫 grep 橫掃＋208 個測試與 execution-log 佐證）。編譯闸門：HEAD <code>8cf46dd</code> GitHub Actions 全綠。完整發現詳情（含行號、修法、規範來源）見同目錄 <code>code-review-report.md</code>。</p>
+
+<h2>2. 架構一致性體檢（結論：一致）</h2>
+<table>
+  <tr><th>層</th><th>邊界規則</th><th>實際狀況</th></tr>
+  <tr><td><code>packages/domain</code></td><td>純 Dart；不 import Flutter/infra/sidecar/dart:io；副作用走 port（FileIo/Clock/SecureStore/AiClient/RecordingAudioSource/ProgressRepository/AuditLogSink）</td><td class="ok">✅ 零違規，且有 domain_purity_test 常駐 CI 看守（M5）</td></tr>
+  <tr><td><code>packages/infra</code></td><td>adapter 實作 domain port；sidecar 全走 SidecarRunner；DB 走 Drift、批次寫入包 transaction</td><td class="ok">✅ 一致；錯誤映射三態（timeout/signal/exit≠0）四個 sidecar wrapper 同構</td></tr>
+  <tr><td><code>app</code></td><td>UI 零業務規則；每 feature 一個 Riverpod Notifier controller；Domain 服務經 Provider 注入</td><td class="ok">✅ 一致；跨 feature 通訊全走 <code>ref.listen</code>，無元件互呼</td></tr>
+  <tr><td>依賴方向</td><td>app → domain＋infra；infra → domain；domain → 無</td><td class="ok">✅ 單向，無循環</td></tr>
+</table>
+
+<h2>3. 已形成的程式風格（明文化，後續即為規範）</h2>
+<p>以下 12 條是從現有 82 檔歸納出的「事實上的專案風格」。後續新增程式碼<strong>必須</strong>與其一致：</p>
+<table>
+  <tr><th style="width:46px">#</th><th style="width:230px">守則</th><th>範例/出處</th></tr>
+  <tr><td>1</td><td>檔案第一行 <code>// AI-Generate</code></td><td>AI 產出的每個檔案（coding-standard §6.5／coding_standard §2.3.5）；人工實質重寫後可加 <code>, reviewed by xxx @ 日期</code></td></tr>
+  <tr><td>2</td><td>doc comment 用 zh-TW 並<strong>引用規格出處</strong></td><td><code>/// PracticeEngine（backend-design.md §3.2.2）。</code>／<code>/// M2：步數等於音節數…</code>——每個公開類別/方法可追溯到設計章節或 M/CT/AT 編號</td></tr>
+  <tr><td>3</td><td>錯誤一律 <code>DomainException(code, message)</code>，code 取自 <code>ErrorCodes</code> 常數</td><td>errors.dart 為 17 碼單一來源；<b>新增錯誤碼必須先改 backend-design §3.2.8 再改碼（三同步）</b></td></tr>
+  <tr><td>4</td><td>邊界驗證在建構子/方法入口，訊息帶實際值</td><td><code>throw ArgumentError('boundaryIndex 需介於 0..N（got $x）')</code>；Domain 內部互信、邊界才驗</td></tr>
+  <tr><td>5</td><td>回傳集合一律 <code>List.unmodifiable</code>；模型類 immutable＋named parameters</td><td>Syllable／PracticeStep／Prosody 等全體如此</td></tr>
+  <tr><td>6</td><td>UI 狀態類手寫 <code>copyWith</code>，nullable 欄位用 <code>_unset</code> 哨兵</td><td>practice_controller.dart:35（可清空 comparison/error 而不誤觸預設）</td></tr>
+  <tr><td>7</td><td>非同步競態用「世代編號」或「重入集合」</td><td>播放 <code>_playRunId</code>；分析 <code>_inProgress</code>；匯出 <code>_activeDestPaths</code>——新長任務照選其一</td></tr>
+  <tr><td>8</td><td>檔案寫入一律 temp→rename 原子搬移；清理放 finally＋啟動 clearTemp 兜底</td><td>AtomicFileIo；practice_exporter 的 temp WAV</td></tr>
+  <tr><td>9</td><td>sidecar 一律經 <code>ProcessRunner</code> 窄介面（可注入假實作）；錯誤三態映射照 ffmpeg_decoder 樣板</td><td>timeout→ERR_SIDECAR_TIMEOUT；signal→ERR_SIDECAR_CRASHED；exit≠0→模組語意碼＋stderr tail(300)</td></tr>
+  <tr><td>10</td><td>「規格常數」單一定義＋雙處引用＋註解標出處</td><td><code>kZeroCrossingSearchWindowMs=10</code>（3.7 吸附與 4.4 fade 共用）；SRS <code>intervalDays=[0,1,3,7,14,30]</code></td></tr>
+  <tr><td>11</td><td>結構防線優先於邏輯防線</td><td>「schema 沒有該欄位」＞「程式擋」：attempt 無音訊欄位（M10）、practice_group 無逾期欄位（M7）——新表沿用此哲學＋db_schema_test 斷言</td></tr>
+  <tr><td>12</td><td>測試命名對應驗收編號；TDD 任務先紅後綠</td><td>test 描述直接寫 CT-xx/AT-xx；演算法模組（M1/M2/M3 級）必先寫紅測試</td></tr>
+</table>
+
+<h2>4. 紅線（違反即 blocking，不談判）</h2>
+<div class="rule"><b>R1・M1 原聲鐵則：</b>任何練習播放/匯出音訊只能來自 <code>renderStep</code> 的 copy＋串接路徑。<span class="no">禁止</span>任何生成、合成、重採樣、音高改寫路徑進入播放或匯出；分析模組只讀不寫。CT-01 位元級回歸測試常駐 CI，動到 PracticeEngine 必先跑它。</div>
+<div class="rule"><b>R2・M5 Domain 純度：</b><code>packages/domain</code> <span class="no">禁止</span> import flutter／infra／sidecar／dart:io（走 port 注入）。domain_purity_test 會擋，不要試圖繞過測試本身。</div>
+<div class="rule"><b>R3・M9/M10 合規與隱私：</b><span class="no">禁止</span> GPL/AGPL/非商用授權碼或模型進 release；FFmpeg 必須 LGPL 動態連結（release gate 會擋 <code>--enable-gpl</code>）。<span class="no">禁止</span>任何 key/個資/錄音落地：key 只進 SecureStore、錄音刪除在 finally、schema 不開音訊欄位。</div>
+<div class="rule"><b>R4・三同步：</b>規則改動＝需求成稿＋程式＋測試同步改，任何一者落後即視同核心被破壞（憲法 C10）。錯誤碼、schema、SRS 參數、靜音規則皆適用。涉及 2.5 核心的變更先過七題變更防線。</div>
+
+<h2>5. 本次發現清單（重點摘錄）</h2>
+<table>
+  <tr><th style="width:70px">編號</th><th style="width:86px">嚴重性</th><th style="width:270px">位置</th><th>問題與修法</th></tr>
+  <tr><td>I-001</td><td><span class="sev imp">important</span></td><td>guardrails/hard-limits-matrix.md:87</td><td>交付備忘寫「20 條 PARTIAL」，統計表為 19（S6-12 更新漏改）。修：一行改字；日後更新統計時全文搜尋舊數字。</td></tr>
+  <tr><td>I-002</td><td><span class="sev imp">important</span></td><td>whisper_transcriber.dart:136／demucs_separator.dart:82／analysis_pipeline.dart:279／practice_controller.dart 多處</td><td><code>ERR_DECODE_FAILED</code> 被借用於轉寫失敗/分離失敗/播放失敗，UI 依碼顯示「解碼失敗，請確認音檔可播放」誤導排錯。修：三同步新增 <code>ERR_TRANSCRIBE_FAILED</code>／<code>ERR_SEPARATE_FAILED</code>（設計檔→errors.dart→error_messages.dart→測試碼數斷言）。</td></tr>
+  <tr><td>S-001</td><td><span class="sev sug">suggestion</span></td><td>sidecar_paths.dart:102</td><td>寫死開發機絕對路徑且 repo 已 public：曝露帳號/目錄、他機靜默降級。修：向上尋 workspace 根，或 README 明示必設 <code>SYLLABLE_REPEATER_DEV_ROOT</code>。</td></tr>
+  <tr><td>S-002</td><td><span class="sev sug">suggestion</span></td><td>prosody_analyzer.dart／recording_comparator.dart</td><td>pitch/autocorrelation/RMS 約 80 行重複，調參會分歧。修：抽 <code>domain/src/dsp/</code> 純函式共用。</td></tr>
+  <tr><td>S-003</td><td><span class="sev sug">suggestion</span></td><td>sidecar_runner.dart:69＋ffmpeg_decoder.dart:72</td><td>stdout 用 growable List&lt;int&gt;＋三次複製，10 分鐘檔峰值記憶體放大。修：BytesBuilder＋view。</td></tr>
+  <tr><td>S-004</td><td><span class="sev sug">suggestion</span></td><td>recording_comparator.dart:91</td><td>OverlayData 帶全解析度波形（10s＝44 萬 double×2）。修：Domain 端降採樣（複用 160-bucket 邏輯）。</td></tr>
+  <tr><td>N-001</td><td><span class="sev nit">nit</span></td><td>requirement.md 各 REQ 章</td><td>章內小節沿用模板「3.1/3.2」編號；AT 追溯不受影響。</td></tr>
+  <tr><td>P-*</td><td><span class="sev praise">praise ×7</span></td><td>—</td><td>結構防線／同源 CI gate／domain purity policy-as-code／checkpoint 續跑／匯出雙層重入鎖／AI-Generate 全覆蓋零殘留／誠實進度紀錄。詳見 code-review-report.md。</td></tr>
+</table>
+
+<h2>6. 效率與效能體檢</h2>
+<table>
+  <tr><th>路徑</th><th>目標</th><th>現況</th></tr>
+  <tr><td>對齊管線（10s 音檔）</td><td>≤ 60s（Q10）</td><td class="ok">實測 4.689s（i5-8259U，2026-07-07 benchmark）——餘裕 12×</td></tr>
+  <tr><td>renderStep／buildSteps</td><td>播放出聲 ≤ 300ms</td><td class="ok">純 copy＋串接 O(n)；PCM 常駐記憶體，無多餘配置熱點</td></tr>
+  <tr><td>DTW 比對（10s 錄音）</td><td>≤ 2s 出圖</td><td class="ok">降採樣 160 buckets＋rolling array DTW（O(a×b) 記憶體 O(b)），測試斷言 2s 內</td></tr>
+  <tr><td>波形渲染</td><td>≥ 30fps</td><td class="ok">peaks 預算快取＋RepaintBoundary 分層；拖動只重繪邊界層（實機幀率待 9.x 實測確認）</td></tr>
+  <tr><td>已知可優化</td><td>—</td><td class="warn">S-003（解碼緩衝三次複製）、S-004（overlay 全解析度）——皆為防禦性優化，不影響現階段驗收</td></tr>
+</table>
+
+<h2>7. 剩餘任務作業須知（給接手的 session／agent）</h2>
+<table>
+  <tr><th style="width:120px">任務</th><th>做什麼</th><th>特別注意</th></tr>
+  <tr><td><b>2.1</b> sidecar 實體</td><td>取得 LGPL-only FFmpeg/ffprobe（shared）＋demucs.cpp binary/model → <code>python3 scripts/prepare_release_sidecars.py</code> staging</td><td>本機 <code>/usr/local/bin/ffmpeg</code> 是 <code>--enable-gpl</code>，<span class="no">只能 dev 用</span>；staging gate 會拒 GPL/static——不要繞過 gate；demucs CLI 是 <code>demucs.cpp.main &lt;model&gt; &lt;wav&gt; &lt;outdir&gt;</code>、vocals 檔名 <code>target_3_vocals.wav</code></td></tr>
+  <tr><td><b>7.2</b> 真 adapter</td><td>flutter_secure_storage Keychain adapter＋provider HTTP adapter，接進既有 <code>AIService</code></td><td>所有外呼<strong>必經</strong> AIService（rate limit／host allowlist／https-only／sanitizer 已在 Domain）；接完把 matrix #11/#19/#20/#22/#23/#31/#34 的 PARTIAL 複核更新＋audit sink 全接</td></tr>
+  <tr><td><b>9.1</b> release build</td><td>entitlements <code>app-sandbox</code> → <code>false</code>（兩份都改，使用者已拍板）→ x86_64 release build</td><td><span class="no">不要</span>用 <code>temporary-exception.files.absolute-path.*</code>（免簽章下無效）；build phase 缺 sidecar staging 會 fail-closed 是預期行為</td></tr>
+  <tr><td><b>9.2</b> 打包發布</td><td>未簽章 .app 打包 zip＋Gatekeeper 略過說明（<code>xattr -cr</code> 或右鍵開啟）</td><td>參考報告三的 README 範式與 make_release_zip 腳本化建議；版本號單一來源</td></tr>
+</table>
+
+<h2>8. 每次動工前後的固定動作</h2>
+<pre># 動工前（任何 session）
+git config core.hooksPath .githooks      # 首次 clone 後一次即可
+flutter pub get
+
+# 交付前（本機同 CI 的完整 gate，一條指令）
+bash scripts/ci_core_checks.sh
+
+# 只動 Domain 時的快速迴圈
+flutter test packages/domain/test && flutter analyze
+
+# 動到 guardrails matrix 後
+python3 scripts/check_guardrails.py \
+  spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/hard-limits-matrix.md \
+  spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/decision-log.md</pre>
+<p>完整指令清單（含 benchmark、staging、單檔測試）見 <code>docs/codex/commands.md</code>。</p>
+
+<div class="foot">本報告為 fullstack-code-review（全專案 QA 模式）隨附交付物之二。發現詳情與規範來源引用見 review/code-review-report.md；Codex agent 守則見 repo 根 AGENTS.md。</div>
+</div></body>
+</html>

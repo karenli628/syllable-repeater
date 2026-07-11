@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>報告一：ai-dev-skills 套件運用評估與建議 — Syllable Repeater</title>
+<style>
+  :root{
+    --ink:#1f2933; --sub:#52606d; --line:#e4e7eb; --bg:#f7f9fb; --card:#ffffff;
+    --blue:#3B6EF5; --amber:#E8A13C; --red:#D94F4F; --green:#2e8b57;
+  }
+  *{box-sizing:border-box}
+  body{font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg);margin:0;line-height:1.75}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 80px}
+  header{border-bottom:3px solid var(--blue);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:26px;margin:0 0 6px}
+  h2{font-size:20px;margin:40px 0 12px;padding-left:12px;border-left:4px solid var(--blue)}
+  h3{font-size:16px;margin:24px 0 8px;color:var(--ink)}
+  .meta{color:var(--sub);font-size:13px}
+  .tldr{background:#eef3ff;border:1px solid #c9d8ff;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:15px}
+  .tldr strong{color:var(--blue)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;background:var(--card);font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#f0f4f8}
+  code,pre{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px}
+  code{background:#eef1f4;padding:1px 5px;border-radius:4px}
+  pre{background:#1f2933;color:#e4e7eb;padding:14px 16px;border-radius:8px;overflow-x:auto;line-height:1.6}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin:12px 0}
+  .ok{color:var(--green);font-weight:600}
+  .warn{color:var(--amber);font-weight:600}
+  .risk{color:var(--red);font-weight:600}
+  .pill{display:inline-block;border-radius:12px;padding:1px 10px;font-size:12px;font-weight:600;margin-right:6px}
+  .pill.done{background:#e2f5e9;color:var(--green)}
+  .pill.now{background:#fdf1de;color:#a06818}
+  .pill.next{background:#e8eefc;color:var(--blue)}
+  .flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:14px 0}
+  .flow .step{background:var(--card);border:1.5px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;white-space:nowrap}
+  .flow .step.done{border-color:var(--green)}
+  .flow .step.now{border-color:var(--amber);background:#fffaf0;font-weight:700}
+  .flow .arrow{color:var(--sub)}
+  ol li,ul li{margin:6px 0}
+  .foot{margin-top:48px;color:var(--sub);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body><div class="wrap">
+
+<header>
+  <h1>報告一：ai-dev-skills 套件運用評估與建議</h1>
+  <div class="meta">專案：Syllable Repeater macOS v1 ｜ 需求：syllable-practice-macos-v1_20260704 ｜ 報告日期：2026-07-07 ｜ 產出：fullstack-code-review（全專案 QA 隨附）</div>
+</header>
+
+<div class="tldr">
+  <strong>一句話結論：</strong>套件用得非常到位——需求→設計→拆分→guardrails→實作的鏈路完整、三同步紀律成立、記憶系統運轉良好；剩下要做的是「照既定順序收尾」：先修 2 條 important → 完成 2.1／7.2／9.1／9.2 → 增量複審 → <code>code-knowledge-init</code>（目前缺 knowledge/）→ <code>project-archive</code> → <code>ops-monitoring</code>，並順手清理根目錄交接檔與用 <code>spec-skills-refresh</code> 把 skills 同步給 Codex。
+</div>
+
+<h2>1. 流程線現況（妳在流程的哪裡）</h2>
+<div class="flow">
+  <span class="step done">requirement-analysis ✅</span><span class="arrow">→</span>
+  <span class="step done">fullstack-design ✅</span><span class="arrow">→</span>
+  <span class="step done">task-split ✅</span><span class="arrow">→</span>
+  <span class="step done">hard-guardrails ✅</span><span class="arrow">→</span>
+  <span class="step now">fullstack-code-implementation（93%）</span><span class="arrow">→</span>
+  <span class="step now">fullstack-code-review（本次）</span><span class="arrow">→</span>
+  <span class="step">code-knowledge-init</span><span class="arrow">→</span>
+  <span class="step">project-archive</span><span class="arrow">→</span>
+  <span class="step">ops-monitoring</span>
+</div>
+<table>
+  <tr><th>指標</th><th>數值</th><th>佐證</th></tr>
+  <tr><td>任務完成度</td><td>54 / 58（93%）；後端 38/42、前端 16/16</td><td>task-split.md 勾選狀態</td></tr>
+  <tr><td>未完成任務</td><td>2.1（sidecar 實體整備）、7.2（真 Keychain/HTTP adapter）、9.1（release build）、9.2（免簽章打包＋說明）</td><td>皆有進度註記，無假完成</td></tr>
+  <tr><td>測試綠燈</td><td>domain 82＋infra 67＋app 59 ＝ 208 tests；flutter analyze 無問題</td><td>HEAD <code>8cf46dd</code> CI run 28836556481 ✅</td></tr>
+  <tr><td>本次審查結論</td><td class="ok">✅ 透過（blocking 0／important 2）</td><td>review/code-review-report.md</td></tr>
+  <tr><td>guardrails matrix</td><td>37 項：IMPLEMENTED 8／PARTIAL 19／APPROVED_NOT_APPLICABLE 10／NOT_REVIEWED 0</td><td>hard-limits-matrix.md（備忘行數字待修，I-001）</td></tr>
+</table>
+
+<h2>2. 各 skill 運用成效評估</h2>
+<table>
+  <tr><th style="width:190px">Skill</th><th style="width:70px">評價</th><th>觀察與證據</th></tr>
+  <tr><td>requirement-analysis</td><td class="ok">優</td><td>2.5 核心維持原則（M1–M10）＋核心驗收總表（CT-01~10）成為全案脊椎；附錄 A 十題逐項定案、修訂歷史留痕（含 11 音節修正、免簽章改道、Q10 實測回填）——這份成稿的品質是後面一切順利的根因。</td></tr>
+  <tr><td>fullstack-design</td><td class="ok">優</td><td>「無伺服器簡化路徑」適配得當：對外介面錨定 Domain API 介面 1–19＋17 錯誤碼總表，前端逐欄位對齊自檢 8/8。唯一待補：實作端已超出設計的 <code>AnalysisEvent</code> 欄位（checkpoint 等）應回寫設計檔（見審查報告偏差記錄）。</td></tr>
+  <tr><td>task-split</td><td class="ok">優</td><td>垂直切片 S0→S6 每片可 demo；TDD 任務（4.1/4.3/4.5/6.1）先紅後綠有序執行；進度註記直接寫回任務底下，形成單一事實來源。</td></tr>
+  <tr><td>hard-guardrails</td><td class="ok">優</td><td>37 項全數有結論、10 條不適用皆使用者親批（無 AI 自批）、5 條 REJECTED 已全數落地轉狀態；<code>check_guardrails.py</code>＋pre-push＋CI 三層看守。C13 臆測揭露在裁決過程實際發揮作用（見 memory 卡）。</td></tr>
+  <tr><td>fullstack-code-implementation</td><td class="ok">優</td><td>AI-Generate 標註 89 檔全覆蓋；交接檔紀律＋8 段啟動提示範本讓跨 session 冷啟動成本極低；未完成任務誠實標註。</td></tr>
+  <tr><td>記憶系統（C7/C8）</td><td class="ok">優</td><td>專案層 49 張卡（decision/pitfall/workflow 三類齊全）、雙層隔離正確、pitfall 卡（如 riverpod3 import、widget test runAsync）可直接省下重踩成本。</td></tr>
+  <tr><td>pipeline-navigator</td><td class="warn">可加強</td><td>未見常駐導航使用痕跡；單人跨多日開發，session 開頭跑一次可少走神。</td></tr>
+  <tr><td>code-knowledge-init</td><td class="risk">未執行</td><td>專案尚無 <code>knowledge/</code> 目錄；<code>project-archive</code> 收尾要增量更新 frontend-project.md／backend-project.md，須先有首版。<strong>建議在 9.2 完成後、archive 之前執行</strong>。</td></tr>
+  <tr><td>ops-monitoring</td><td class="pill next">排程中</td><td>流程上在 project-archive 之後；屆時把 §4.4「交付後由什麼看守」意向稿細化成核心監測映射。</td></tr>
+  <tr><td>spec-skills-refresh</td><td class="pill next">建議啟用</td><td>妳要求 Codex 接手部分工作——此 skill 正是把本機 skills/ 同步到 Codex 技能目錄的工具，與本次交付的 <code>AGENTS.md</code>／<code>docs/codex/</code> 互補（見報告內第 5 節與 docs/codex/README 指引）。</td></tr>
+</table>
+
+<h2>3. 建議的收尾順序（照做即可）</h2>
+<ol>
+  <li><strong>修 2 條 important</strong>（同一個 session 可完成）：
+    <ul>
+      <li>I-001：<code>hard-limits-matrix.md:87</code>「20 條」改「19 條」（一行）。</li>
+      <li>I-002：新增 <code>ERR_TRANSCRIBE_FAILED</code>／<code>ERR_SEPARATE_FAILED</code> 錯誤碼——先過七題變更防線（很小），再三同步：backend-design §3.2.8 → errors.dart → error_messages.dart → frontend-design 功能點 8 → 測試碼數斷言。</li>
+    </ul>
+  </li>
+  <li><strong>任務 2.1</strong>：取得 LGPL-only FFmpeg（shared/dylib）＋demucs.cpp 二進位與模型 → 跑 <code>scripts/prepare_release_sidecars.py</code> staging → 勾選 2.1。（報告三提供把這步「腳本化」的降風險做法）</li>
+  <li><strong>任務 7.2</strong>：真 Keychain adapter（flutter_secure_storage）＋真 provider HTTP adapter；接上後把 matrix #11/#19/#20/#22/#23/#31/#34 的 PARTIAL 註記逐條複核更新。</li>
+  <li><strong>任務 9.1／9.2</strong>：關 App Sandbox（entitlements → false，M9 前置已拍板）→ release build → 未簽章打包＋Gatekeeper 說明（報告三有 README 範式）。</li>
+  <li><strong>增量複審</strong>：重跑 fullstack-code-review（只需針對 I-001/I-002 與 2.1~9.2 新增碼定向複查）。</li>
+  <li><strong>code-knowledge-init → project-archive → ops-monitoring</strong>：依序收尾，一次一個 session，乾淨交接。</li>
+</ol>
+
+<h2>4. 工作區衛生建議（本次審查順帶發現）</h2>
+<div class="card">
+  <ul>
+    <li><span class="warn">交接檔堆積</span>：根目錄有 12 份「交接檔-*.md」，其中 <code>…S2-PracticeEngine_FP4拷貝.md</code> 為重複拷貝，且 git status 顯示 5 份未追蹤。建議建 <code>spec-syllable-repeater/handoffs/</code>（或 <code>docs/handoffs/</code>）collect 歸檔＋刪除「拷貝」檔，並決定交接檔是否進版控（建議進——它是專案史料，且 repo 已 public 前先確認內容無個資路徑）。</li>
+    <li><span class="warn">根目錄雜物</span>：<code>step up your coding skills to a new level.mp3</code>（測試音檔，80KB）與 <code>HANDOFF_手機端討論.md</code>／<code>PLAN3.0.md</code> 混在根目錄——mp3 建議移入 <code>.local-tools/fixtures/</code>（並確認 .gitignore 涵蓋），計畫文件移 <code>docs/</code>。</li>
+    <li><span class="ok">記憶索引健康</span>：MEMORY.md（通用層）僅 3 條索引、專案層卡片不進全域索引——隔離規則執行正確，無需調整。</li>
+  </ul>
+</div>
+
+<h2>5. 與 Codex 協作的銜接（本次已交付）</h2>
+<table>
+  <tr><th>交付物</th><th>位置</th><th>用途</th></tr>
+  <tr><td>AGENTS.md</td><td>repo 根目錄</td><td>Codex（及任何 coding agent）自動讀取的專案守則：M1–M10 紅線、架構邊界、指令、風格、流程</td></tr>
+  <tr><td>提示詞庫</td><td>docs/codex/prompts.md</td><td>依 8 段啟動提示範本改寫的可貼上 prompt：session 起手＋剩餘任務 2.1/7.2/9.1/9.2 專用</td></tr>
+  <tr><td>指令速查</td><td>docs/codex/commands.md</td><td>測試／分析／CI／guardrails／benchmark／staging 全部指令與預期輸出</td></tr>
+</table>
+<div class="card">
+  <strong>建議用法：</strong>Codex 開新對話 → 它自動讀 AGENTS.md → 妳貼上 prompts.md 對應任務的提示詞即可動工。若要讓 Codex 也能執行 ai-dev-skills 的技能流程（而不只是遵守守則），再跑一次 <code>spec-skills-refresh</code> 把 skills/ 同步到 Codex 的技能目錄。<br>
+  <span class="risk">提醒：</span>Codex 沒有這裡的記憶系統——AGENTS.md 內已把最關鍵的 pitfall（sandbox、Drift tableName、runAsync、--no-gpu 等）內嵌成守則，避免它重踩。
+</div>
+
+<h2>6. 套件本身的回饋（可回饋給 skills 維護）</h2>
+<ul>
+  <li>fullstack-code-review 的 BE-*/FE-* 檢查項以 Java/Vue 為基準——本專案（Dart/Flutter）第二次出現「字面不適用、取其精神」的情況；若 Dart 專案會繼續出現，值得在 references/ 增補一份 Dart/Flutter 對照附錄（一次成本、多專案受益）。</li>
+  <li>交接檔目前放專案根目錄是「約定俗成」而非 skill 明文；建議把「交接檔存放位置」寫進 fullstack-code-implementation 的規範（或 memory 升級為 workflow 卡），根目錄只留最新一份的捷徑。</li>
+</ul>
+
+<div class="foot">本報告為 fullstack-code-review（全專案 QA 模式）隨附交付物之一。相關檔案：review/code-review-report.md（審查正文）、report-2-coding-style-guardrails.html（風格與守則）、report-3-qwenasr-benchmark.html（外部專案借鏡）。</div>
+</div></body>
+</html>

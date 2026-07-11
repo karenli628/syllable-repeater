@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>報告三：QwenASRMiniTool 借鏡分析 — Syllable Repeater</title>
+<style>
+  :root{
+    --ink:#1f2933; --sub:#52606d; --line:#e4e7eb; --bg:#f7f9fb; --card:#ffffff;
+    --blue:#3B6EF5; --amber:#E8A13C; --red:#D94F4F; --green:#2e8b57; --teal:#0d9488;
+  }
+  *{box-sizing:border-box}
+  body{font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg);margin:0;line-height:1.75}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 80px}
+  header{border-bottom:3px solid var(--teal);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:26px;margin:0 0 6px}
+  h2{font-size:20px;margin:40px 0 12px;padding-left:12px;border-left:4px solid var(--teal)}
+  h3{font-size:16px;margin:22px 0 8px}
+  .meta{color:var(--sub);font-size:13px}
+  .tldr{background:#e6f7f5;border:1px solid #b8e4df;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:15px}
+  .tldr strong{color:var(--teal)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;background:var(--card);font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#f0f4f8}
+  code,pre{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px}
+  code{background:#eef1f4;padding:1px 5px;border-radius:4px}
+  pre{background:#1f2933;color:#e4e7eb;padding:14px 16px;border-radius:8px;overflow-x:auto;line-height:1.6}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin:12px 0}
+  .borrow{border-left:5px solid var(--green)}
+  .avoid{border-left:5px solid var(--red);background:#fdf3f3}
+  .ok{color:var(--green);font-weight:600}
+  .warn{color:var(--amber);font-weight:600}
+  .no{color:var(--red);font-weight:700}
+  .tag{display:inline-block;border-radius:12px;padding:1px 10px;font-size:12px;font-weight:600;margin-right:6px;background:#e8eefc;color:var(--blue)}
+  .pri{display:inline-block;border-radius:4px;padding:1px 8px;font-size:12px;font-weight:700;color:#fff;background:var(--teal)}
+  ol li,ul li{margin:6px 0}
+  .foot{margin-top:48px;color:var(--sub);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body><div class="wrap">
+
+<header>
+  <h1>報告三：QwenASRMiniTool 借鏡分析</h1>
+  <div class="meta">對照專案：github.com/karenli628/QwenASRMiniTool（Windows／Python／已出貨，CTk 1.0.9＋WebView 0.2 雙版本線）｜ 本專案：Syllable Repeater macOS v1（Dart/Flutter，93%）｜ 分析日期：2026-07-07（shallow clone 實讀原始碼）</div>
+</header>
+
+<div class="tldr">
+  <strong>一句話結論：</strong>最值得借的是它「<strong>重工件按需下載＋工具就緒狀態 UI＋腳本化發布</strong>」這一整套出貨經驗——正好對準本專案僅剩的高風險段（2.1 sidecar 實體與 9.1/9.2 發布）；同時有 <span class="no">4 個地雷絕不可照抄</span>（GPL FFmpeg 下載源、SSL 不驗證降級、3300 行單檔 UI、伺服器/批次功能），照抄任一個都會直接違反本專案的 M9／安全基線／架構守則／Non-scope。
+</div>
+
+<h2>1. 兩專案對照</h2>
+<table>
+  <tr><th></th><th>QwenASRMiniTool</th><th>Syllable Repeater</th></tr>
+  <tr><td>定位</td><td>本地語音辨識→SRT 字幕（資料不離開電腦）</td><td>本地音節疊加跟讀練習（原聲不可替換）</td></tr>
+  <tr><td>成熟度</td><td><b>已出貨多版</b>（GitHub Releases＋自我更新）</td><td>開發 93%，未發布</td></tr>
+  <tr><td>技術</td><td>Python＋CustomTkinter/WebView2，PyInstaller 打包</td><td>Dart/Flutter 三層（domain/infra/app），M5 純度防線</td></tr>
+  <tr><td>重工件策略</td><td>模型/ffmpeg <b>不隨包、首次使用按需下載</b>（斷點續傳＋主備援源＋鏡像）</td><td>sidecar 隨 App bundle（2.1 staging gate 已建，<b>實體工件尚缺</b>）</td></tr>
+  <tr><td>外部行程</td><td>subprocess＋Windows Job Object 連坐回收</td><td>SidecarRunner（timeout→SIGKILL、signal 偵測）</td></tr>
+  <tr><td>架構紀律</td><td>app.py 3304 行單檔起家，後期才拆 WebView 後端</td><td class="ok">一開始就分層＋policy-as-code 看守（更優，勿倒退）</td></tr>
+  <tr><td>測試/CI</td><td>未見自動化測試與 CI</td><td class="ok">208 tests＋同源本機/雲端 gate（更優，勿倒退）</td></tr>
+</table>
+<p>一句話定性：<b>QwenASR 強在「出貨與營運的最後一哩」，本專案強在「工程紀律與核心防線」</b>——借它的最後一哩，守住自己的紀律。</p>
+
+<h2>2. 可借鏡清單（依「加速完成、降低失敗率」排序）</h2>
+
+<div class="card borrow">
+  <h3><span class="pri">優先 1</span> 工件下載器模式 → 直接解 2.1 的「等工件」僵局</h3>
+  <p><span class="tag">出處</span><code>downloader.py</code>（840 行，純標準庫）：斷點續傳、SHA 完整性驗證、主倉庫失敗自動切備援倉庫、鏡像站改寫、下載進度回呼。</p>
+  <p><span class="tag">落點</span>寫一支 <code>scripts/fetch_sidecar_artifacts.py</code>（或並入 prepare_release_sidecars.py 前段）：從<b>妳核可的來源</b>下載 LGPL-shared FFmpeg/ffprobe、whisper.cpp 二進位、<code>ggml-small.en.bin</code>、demucs.cpp 二進位＋<code>ggml-model-htdemucs-4s-f16.bin</code>，每個工件寫死 <b>SHA-256＋來源 URL＋授權</b> 三元組，下載完自動接跑既有 license gate 與 staging。</p>
+  <p><span class="tag">效益</span>2.1 從「手動蒐集工件、換機重來」變成「一條指令可重現」；同時是 9.1 CI 化與未來 Apple Silicon 版的基礎。<span class="warn">注意：</span>demucs.cpp 二進位大概率仍需本機自行編譯（上游未必發布 x86_64 release）——腳本設計成「有 URL 就下載、沒 URL 就檢查本機產物並提示編譯指令」。</p>
+</div>
+
+<div class="card borrow">
+  <h3><span class="pri">優先 2</span> 「工具就緒狀態」UI 模式 → 把降級從隱性變顯性</h3>
+  <p><span class="tag">出處</span>QwenASR 開機不強制下載模型：模型頁顯示每個核心「已就緒／未下載」＋「下載並載入」按鈕，其餘功能照常可用。</p>
+  <p><span class="tag">落點</span>本專案已有半成品（<code>demucsReadyProvider</code>＋未就緒 tooltip、<code>missingPaths()</code> 缺件降級 preview runner）——建議在設定頁加一個「<b>分析工具狀態</b>」區塊：逐列 ffmpeg／whisper／模型／cmudict／demucs 的就緒狀態與路徑，缺件時顯示取得指引（未來可接優先 1 的下載器）。</p>
+  <p><span class="tag">效益</span>把「靜默 fallback 到 preview runner」（審查發現 S-001 的隱性行為）變成使用者看得懂的狀態，換機/親友試用時自助排錯，支援成本大降。</p>
+</div>
+
+<div class="card borrow">
+  <h3><span class="pri">優先 3</span> 腳本化發布 → 9.2 的樣板</h3>
+  <p><span class="tag">出處</span><code>make_release_zip.bat</code>＋<code>version.py</code>：版本號單一事實來源、staging 排除大型工件與個人資料（robocopy /XD）、產出版本化 ZIP、末尾直接印「下一步：開 Release、上傳資產」。</p>
+  <p><span class="tag">落點</span>寫 <code>scripts/make_release_zip.py</code>（Python，與現有 scripts 一致）：讀取單一版本常數 → 打包未簽章 <code>.app</code> → 排除 dev 工件 → 產 <code>SHA256SUMS</code> → 隨附 <code>安裝說明.md</code>（Gatekeeper 略過步驟）→ 印出 GitHub Release 待辦三行。9.2 的驗收（AT-09-03）就以這個腳本產物為準。</p>
+  <p><span class="tag">效益</span>發布從「一次性手工」變成可重複、可寫進 release-checklist.md 的固定程序。</p>
+</div>
+
+<div class="card borrow">
+  <h3><span class="pri">優先 4</span> README／安裝說明的寫法 → 9.2 文件範式</h3>
+  <p><span class="tag">出處</span>QwenASR README：第一段就是價值主張＋隱私承諾（「資料不離開你的電腦」）、每個分頁一張截圖、目標讀者設定為「同事、同學、阿嬤」、版本線清楚、舊文件另檔隔離（oldreadme.md）。</p>
+  <p><span class="tag">落點</span>本專案 repo 目前<b>沒有使用者導向 README</b>。9.2 時比照結構寫：①這是什麼＋M10 隱私承諾（錄音用完即刪，是天然賣點）②安裝三步（下載 zip → <code>xattr -cr</code> 或右鍵開啟 → 完成）附截圖 ③功能導覽每頁一圖 ④已知限制（Intel 優先、10 分鐘上限）。開發文件（PLAN3.0、交接檔）另檔隔離，README 只服務使用者。</p>
+</div>
+
+<div class="card borrow">
+  <h3><span class="pri">優先 5</span> 模型檔預檢（--show 驗證）→ 消滅「壞模型神祕失敗」</h3>
+  <p><span class="tag">出處</span><code>fa_aligner.py</code>：載入前先跑 <code>main.exe --show</code> 確認模型檔真的是 ForcedAligner，不對就降級並明講原因；失敗一律回 <code>[]</code> 讓呼叫端退回比例估算。</p>
+  <p><span class="tag">落點</span><code>missingPaths()</code> 目前只檢查「檔案存在」——可加輕量預檢：模型檔大小下限＋magic bytes（ggml/gguf 頭），或首次啟動用 1 秒靜音 WAV 跑一次 whisper 煙霧測試並快取結果。下載中斷的半個模型檔（466MB 的 small.en 很容易發生）就不會以「辨識神祕失敗」呈現。</p>
+  <p><span class="tag">附註</span>它「FA 失敗→退回比例估算」與本專案「等比例切＋needsReview」是同一個設計哲學——互相印證這條路是對的。它用的 qwen3-forcedaligner（GGUF）也是未來「切點精度外掛」候選之一（與 MFA 並列，屆時先過 M9 授權核對）。</p>
+</div>
+
+<div class="card borrow">
+  <h3><span class="pri">優先 6</span> 孤兒行程回收 → M4 的最後一塊補強</h3>
+  <p><span class="tag">出處</span><code>proc_guard.py</code>：Windows Job Object <code>KILL_ON_JOB_CLOSE</code>——主行程死（含強殺/崩潰），OS 自動連坐回收所有子行程；模組級持有 handle 防 GC 提早觸發；非 Windows 靜默降級。</p>
+  <p><span class="tag">落點</span>macOS 上父行程死亡<b>不會</b>自動殺子行程：使用者在 whisper 跑到一半強退 App，whisper-cli 會變孤兒繼續燒 CPU。SidecarRunner 已處理 timeout/kill，但管不到「App 本體被強殺」。低成本補法：App 啟動時清掃（沿用「啟動 clearTemp」哲學）——sidecar 啟動時把 PID 記到 temp 下的 pidfile，App 下次啟動比對仍存活的舊 PID（驗證行程名）後回收。Windows 版（Phase 2）直接翻譯 proc_guard 的 Job Object 作法。</p>
+  <p><span class="tag">效益</span>單人自用影響小，屬 M4 完整性的收尾；建議記入 backlog 而非 v1 必做（守 MVP 邊界）。</p>
+</div>
+
+<div class="card borrow">
+  <h3><span class="pri">優先 7</span> GitHub Releases 自我更新 → Phase 2 роadmap</h3>
+  <p><span class="tag">出處</span><code>updater.py</code>：查 Releases API 比對版本 → 下載 ZIP → helper script 等主程式退出後疊加覆蓋（保留使用者資料目錄）→ 重啟。更新包刻意不含模型（小包快傳）。</p>
+  <p><span class="tag">落點</span>v1 <b>不做</b>（Non-scope 紀律；免簽章 App 自我更新在 macOS 上還會反覆觸發 Gatekeeper，體驗差）。記入 Phase 2／取得 Developer ID 之後再評估；屆時「更新包不含 sidecar 模型」的拆分策略直接沿用。</p>
+</div>
+
+<h2>3. 絕不可照抄清單（照抄即違規）</h2>
+<div class="card avoid">
+  <ol>
+    <li><b>GPL FFmpeg 下載源。</b>QwenASR 下載的是 BtbN <code>…-win64-<span class="no">gpl</span>-essentials.zip</code>——對它（免費工具、不在意 GPL）沒事，對本專案是 <span class="no">M9 紅線直接違反</span>。借下載器「模式」時，來源必須換成 LGPL-shared build 並過既有 license gate（gate 已會擋 <code>--enable-gpl</code>，不要繞）。</li>
+    <li><b>SSL 驗證降級。</b><code>downloader._ssl_ctx()</code> 最後一層 fallback 是 <code>CERT_NONE</code>（不驗證憑證）。本專案的安全基線（matrix #20 https-only、#31 host allowlist 的精神）不允許——寫下載器時<span class="no">憑證驗證失敗就失敗</span>，改靠 SHA-256 pinning 保完整性，不做不驗證降級。</li>
+    <li><b>單檔巨型 UI。</b><code>app.py</code> 3304 行是它的歷史債（後期才拆 WebView 後端）。本專案「一 screen 一檔＋controller 分離」是刻意設計，任何「先塞同一檔再說」都是倒退。</li>
+    <li><b>伺服器／通道／批次功能。</b><code>api_server.py</code>、<code>cf_tunnel.py</code>、批次分頁對它是賣點，對本專案是 <span class="no">Non-scope 5（無伺服器）與 v1 不做批次</span>的明確範圍外——看到別人有，不等於要加（憲法 C5）。</li>
+  </ol>
+</div>
+
+<h2>4. 降低失敗率的行動順序（把借鏡變任務）</h2>
+<table>
+  <tr><th style="width:56px">順序</th><th>行動</th><th>對應任務</th><th>預期效果</th></tr>
+  <tr><td>①</td><td>寫 <code>fetch_sidecar_artifacts.py</code>（SHA pinning＋LGPL 來源＋接 staging gate）</td><td>2.1</td><td>工件取得可重現、換機不重來、CI 可全自動</td></tr>
+  <tr><td>②</td><td>設定頁「分析工具狀態」區塊（就緒/缺件/指引）</td><td>2.1 收尾/FP7 增補</td><td>降級顯性化、親友測試自助排錯</td></tr>
+  <tr><td>③</td><td>模型檔預檢（大小/magic bytes 或煙霧測試）</td><td>2.1 收尾</td><td>消滅「下載半截模型→神祕失敗」這類最難查的回報</td></tr>
+  <tr><td>④</td><td><code>make_release_zip.py</code>＋使用者 README（Gatekeeper 三步驟）</td><td>9.1／9.2</td><td>發布可重複；AT-09-03 有明確產物可驗</td></tr>
+  <tr><td>⑤</td><td>孤兒 sidecar 啟動清掃（pidfile）</td><td>backlog（M4 補強）</td><td>強殺 App 不留殭屍 whisper</td></tr>
+  <tr><td>⑥</td><td>自我更新（Releases）</td><td>Phase 2</td><td>留 roadmap，不進 v1</td></tr>
+</table>
+<p><span class="warn">範圍提醒：</span>①～③ 若要納入 v1，屬「允許變動」範疇的工具鏈增強（不動核心規則），仍建議先以七題變更防線快速走一遍並在 task-split 增列，維持三同步紀律。</p>
+
+<h2>5. 順帶的反向印證（本專案已經做對的事）</h2>
+<ul>
+  <li>QwenASR 的「失敗退回比例估算」＝本專案「等比例切＋needsReview」——同一哲學，已內建。</li>
+  <li>QwenASR 用「更新包不含模型」控制體積＝本專案「MFA/CREPE/WORLD 外掛化、零 Python」的既定決策——方向一致。</li>
+  <li>QwenASR 沒有測試與 CI，靠人肉回歸；本專案 208 tests＋同源 gate——<b>這是妳相對它最大的資產，收尾階段不要為趕進度犧牲</b>。</li>
+</ul>
+
+<div class="foot">分析方法：shallow clone 至本機 scratchpad 實讀原始碼（app.py／downloader.py／proc_guard.py／fa_aligner.py／ffmpeg_utils.py／updater.py／version.py／build 與 release 腳本／README）。本報告為 fullstack-code-review 隨附交付物之三；授權注意事項以本專案 requirement M9 白名單為準。</div>
+</div></body>
+</html>
