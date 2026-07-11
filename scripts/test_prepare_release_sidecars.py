@@ -84,6 +84,20 @@ class PrepareReleaseSidecarsTest(unittest.TestCase):
             self.assertEqual(1, manifest["schemaVersion"])
             self.assertEqual("Contents/Resources/sidecar", manifest["layout"])
 
+    def test_canonical_dylib_name_keeps_major_version(self):
+        self.assertEqual(
+            "libavcodec.62.dylib",
+            prepare_release_sidecars._canonical_dylib_name(
+                "libavcodec.62.28.102.dylib",
+            ),
+        )
+        self.assertEqual(
+            "libmp3lame.0.dylib",
+            prepare_release_sidecars._canonical_dylib_name(
+                "libmp3lame.0.dylib",
+            ),
+        )
+
 
 def _fake_ffmpeg(path):
     return _fake_executable(

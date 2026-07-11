@@ -22,9 +22,14 @@ flutter pub get
 section "Hard guardrails"
 python3 scripts/check_guardrails.py "$MATRIX" "$DECISION_LOG"
 
+section "Handoff/pipeline-state gate"
+if [ -f scripts/check_handoff.py ]; then
+  python3 scripts/check_handoff.py --all
+fi
+
 section "CT-09 license gate"
 python3 scripts/check_licenses.py "$LICENSE_MANIFEST"
-python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py
+python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py scripts/test_fetch_sidecar_artifacts.py scripts/test_make_release_zip.py
 
 section "CT-01..CT-10 domain tests"
 flutter test packages/domain/test

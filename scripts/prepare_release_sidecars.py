@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -205,16 +206,21 @@ def _stage(plan: dict) -> None:
             shutil.copy2(source, dest)
             if entry["kind"] == "bin":
                 _make_executable(dest)
-                _patch_macho_rpath(dest)
         staged.append(_manifest_entry(entry["label"], dest))
 
     for lib_dir in plan["lib_dirs"]:
         for dylib in sorted(lib_dir.glob("*.dylib")):
             dest = output_dir / "lib" / dylib.name
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(dylib, dest)
+            if dylib.is_symlink():
+                if dest.exists() or dest.is_symlink():
+                    dest.unlink()
+                dest.symlink_to(os.readlink(dylib))
+            else:
+                shutil.copy2(dylib, dest)
             staged.append(_manifest_entry(f"lib:{dylib.name}", dest))
 
+    _patch_macho_bundle(output_dir)
     _write_manifest(output_dir, staged)
 
 
@@ -233,11 +239,26 @@ def _make_executable(path: Path) -> None:
     path.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _patch_macho_rpath(path: Path) -> None:
+def _patch_macho_bundle(output_dir: Path) -> None:
+    if not shutil.which("install_name_tool"):
+        return
+    lib_names = {path.name for path in (output_dir / "lib").glob("*.dylib")}
+    for binary in (output_dir / "bin").glob("*"):
+        if binary.is_file():
+            _patch_macho_rpath(binary, "@executable_path/../lib")
+            _patch_macho_dependencies(binary, lib_names)
+    for dylib in (output_dir / "lib").glob("*.dylib"):
+        if dylib.is_symlink():
+            continue
+        _patch_macho_rpath(dylib, "@loader_path")
+        _patch_macho_id(dylib)
+        _patch_macho_dependencies(dylib, lib_names)
+
+
+def _patch_macho_rpath(path: Path, release_rpath: str) -> None:
     if not shutil.which("install_name_tool") or not _is_macho(path):
         return
     rpaths = _macho_rpaths(path)
-    release_rpath = "@executable_path/../lib"
     for rpath in rpaths:
         if ".local-tools" in rpath or rpath.startswith("/Users/"):
             subprocess.run(
@@ -251,6 +272,40 @@ def _patch_macho_rpath(path: Path) -> None:
         )
 
 
+def _patch_macho_id(path: Path) -> None:
+    if not _is_macho(path):
+        return
+    subprocess.run(
+        ["install_name_tool", "-id", f"@rpath/{_canonical_dylib_name(path.name)}", str(path)],
+        check=False,
+    )
+
+
+def _canonical_dylib_name(name: str) -> str:
+    match = re.match(r"^(lib.+?)\.(\d+)(?:\.\d+)*\.dylib$", name)
+    if not match:
+        return name
+    return f"{match.group(1)}.{match.group(2)}.dylib"
+
+
+def _patch_macho_dependencies(path: Path, lib_names: set[str]) -> None:
+    if not lib_names or not _is_macho(path):
+        return
+    for dependency in _macho_dependencies(path):
+        dep_name = Path(dependency).name
+        if dep_name in lib_names and dependency != f"@rpath/{dep_name}":
+            subprocess.run(
+                [
+                    "install_name_tool",
+                    "-change",
+                    dependency,
+                    f"@rpath/{dep_name}",
+                    str(path),
+                ],
+                check=False,
+            )
+
+
 def _is_macho(path: Path) -> bool:
     result = subprocess.run(
         ["file", str(path)],
@@ -260,6 +315,22 @@ def _is_macho(path: Path) -> bool:
         check=False,
     )
     return "Mach-O" in result.stdout
+
+
+def _macho_dependencies(path: Path) -> list[str]:
+    result = subprocess.run(
+        ["otool", "-L", str(path)],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    dependencies = []
+    for line in result.stdout.splitlines()[1:]:
+        value = line.strip().split(" (compatibility", 1)[0]
+        if value:
+            dependencies.append(value)
+    return dependencies
 
 
 def _macho_rpaths(path: Path) -> list[str]:
