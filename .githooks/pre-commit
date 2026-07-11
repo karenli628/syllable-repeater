@@ -35,5 +35,11 @@ if echo "$STAGED" | grep -qE "^\\.env$|/\\.env$"; then
     exit 1
 fi
 
+# 3) 交接檔/pipeline-state 硬閘門（handoff skill 配套：假完成、中斷證據、凍結、LATEST/state 同 commit）
+if [ -f scripts/check_handoff.py ] && echo "$STAGED" | grep -qE "(/handoffs/|pipeline-state\.md$)"; then
+    echo "[pre-commit] 檢查交接檔/pipeline-state..."
+    python3 scripts/check_handoff.py --staged || exit 1
+fi
+
 echo "[pre-commit] ✅ 檢查通過。"
 exit 0

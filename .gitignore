@@ -1,6 +1,7 @@
 # Dart / Flutter
 .dart_tool/
 build/
+dist/
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
 pubspec.lock
@@ -8,6 +9,9 @@ pubspec.lock
 
 # 本機開發工具與大型模型（whisper.cpp / ggml-small.en 等）
 .local-tools/
+
+# 交接檔草稿（未定版；正式版位於 spec-*/handoffs/ 進版控）
+spec-*/handoffs/drafts/
 
 # macOS
 .DS_Store
