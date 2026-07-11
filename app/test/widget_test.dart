@@ -26,6 +26,6 @@ void main() {
   ) async {
     await tester.pumpWidget(const SyllableRepeaterApp());
 
-    expect(ErrorMessages.mappedCodeCount, 17);
+    expect(ErrorMessages.mappedCodeCount, 19);
   });
 }

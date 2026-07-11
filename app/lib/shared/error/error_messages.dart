@@ -31,6 +31,16 @@ abstract final class ErrorMessages {
       message: '請確認音檔可播放，或重新選擇音檔再試一次。',
       icon: Icons.sync_problem_outlined,
     ),
+    ErrorCodes.transcribeFailed: ErrorPresentation(
+      title: '辨識失敗',
+      message: '語音辨識未完成，可保留目前資料後重試辨識階段。',
+      icon: Icons.record_voice_over_outlined,
+    ),
+    ErrorCodes.separateFailed: ErrorPresentation(
+      title: '人聲分離失敗',
+      message: '可跳過人聲分離改用原音重試，或稍後再試。',
+      icon: Icons.multitrack_audio_outlined,
+    ),
     ErrorCodes.sidecarCrashed: ErrorPresentation(
       title: '分析工具中斷',
       message: '外部分析工具意外中止，可以保留目前資料後重試。',

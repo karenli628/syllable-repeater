@@ -1,2 +1,6 @@
 #include "../../Flutter/Flutter-Release.xcconfig"
 #include "Warnings.xcconfig"
+
+// Syllable Repeater v1 release 先行範圍為 Intel x86_64（AGENTS.md §5 / task 9.1）。
+ARCHS = x86_64
+ONLY_ACTIVE_ARCH = YES

@@ -6,7 +6,18 @@ This directory is the local staging source for macOS release sidecars.
 Generated binaries, models, dictionaries, dylibs, and `sidecar-manifest.json`
 are intentionally ignored by git.
 
-Prepare it with:
+Inventory or fetch artifacts first:
+
+```bash
+python3 scripts/fetch_sidecar_artifacts.py --inventory-only
+python3 scripts/fetch_sidecar_artifacts.py --print-template
+```
+
+Only write `release/sidecar-artifacts.json` after the source URLs and SHA-256
+values are confirmed. The fetch script rejects non-HTTPS URLs, missing hashes,
+TLS verification bypasses, GPL/nonfree licenses, and static LGPL artifacts.
+
+Prepare staging with:
 
 ```bash
 python3 scripts/prepare_release_sidecars.py \

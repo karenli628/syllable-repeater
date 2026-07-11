@@ -689,6 +689,16 @@ class _FakeAiSettingsService implements AiSettingsService {
   Future<void> configureCredential(String credential) async {
     configuredCredentials.add(credential);
   }
+
+  @override
+  Future<Translation> translate(String text, String targetLang) async {
+    return Translation(
+      text: 'fake translation',
+      source: TranslationSource.ai,
+      modelName: 'fake-model',
+      createdAt: DateTime.utc(2026, 7, 7),
+    );
+  }
 }
 
 class _FakeLessonPackService implements LessonPackService {
