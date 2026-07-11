@@ -91,7 +91,7 @@ graph TD
 
 ## 四、功能邏輯實作
 
-> 錯誤處理總策略見「功能點 8」末之**錯誤碼對照表**（涵蓋 backend-design.md §3.2.8 全部 17 碼）；各功能點不重複列全表。
+> 錯誤處理總策略見「功能點 8」末之**錯誤碼對照表**（涵蓋 backend-design.md §3.2.8 全部 19 碼）；各功能點不重複列全表。
 
 ### 功能點 1：課件庫與今日到期（library）
 
@@ -341,13 +341,15 @@ sequenceDiagram
 
 ### 功能點 8：全域錯誤處理（shared/error）
 
-**錯誤碼對照表**（逐一涵蓋 backend-design.md §3.2.8 全部 17 碼）：
+**錯誤碼對照表**（逐一涵蓋 backend-design.md §3.2.8 全部 19 碼）：
 
 | 錯誤碼 | 前端處理策略 |
 |--------|--------------|
 | `ERR_UNSUPPORTED_FORMAT` | 匯入區就地錯誤，選檔器過濾四格式雙保險 |
 | `ERR_FILE_TOO_LONG` | 就地錯誤「超過 10 分鐘上限」 |
-| `ERR_DECODE_FAILED` | 就地錯誤＋重試鈕；可再次匯入 |
+| `ERR_DECODE_FAILED` | 就地錯誤＋重試鈕；可再次匯入（FFmpeg 解碼階段） |
+| `ERR_TRANSCRIBE_FAILED` | SnackBar＋「重試辨識階段」；已解碼 PCM 之 checkpoint 保留（whisper 階段） |
+| `ERR_SEPARATE_FAILED` | SnackBar＋「跳過分離改用原音」按鈕；解碼 PCM 保留（demucs 階段） |
 | `ERR_SIDECAR_CRASHED` | SnackBar＋「重試此階段」；已完成階段結果保留提示 |
 | `ERR_SIDECAR_TIMEOUT` | 同上＋連結至設定調高逾時 |
 | `ERR_ANALYSIS_IN_PROGRESS` | 匯入鈕置灰（正常情況 UI 已防，此為兜底忽略） |
@@ -376,7 +378,7 @@ sequenceDiagram
 | 3 | 輸出參數欄位逐一對齊 | ✅ 巢狀（overlayData、result.syllables）展開至葉子 |
 | 4 | 來源標註 | ✅ 每介面標 `來源：backend-design.md §3.2.x 介面N` |
 | 5 | 型別與後端一致 | ✅ UI 直接複用 domain 套件型別，無重複定義、無映射（Dart 取代 TS，規則等效） |
-| 6 | 錯誤碼全涵蓋 | ✅ 17/17 碼有處理策略（功能點 8） |
+| 6 | 錯誤碼全涵蓋 | ✅ 19/19 碼有處理策略（功能點 8） |
 | 7 | 新增/變更欄位標註 | ✅ 全為新專案首建，無 [變更]；無修改既有介面 |
 | 8 | 無臆造介面 | ✅ 無 backend 未定義之介面；無 [需後端設計補充] 項 |
 

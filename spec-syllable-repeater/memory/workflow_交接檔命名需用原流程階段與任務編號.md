@@ -11,4 +11,10 @@ confidence: high
 status: active
 verified_count: 1
 created: 2026-07-05
-last_used: 2026-07-05
+last_used: 2026-07-07
+
+## 升級 2026-07-07（不改原文，僅補新規範連結）
+
+- **檔名新增流水號**：格式升級為 `交接檔-<yyyymmdd>-<NN>-<skill>_<切片>_<關鍵字>.md`；`NN`＝同日流水號 01 起，跨日重設。
+- **落點升級**：新產出的交接檔一律進 `spec-<專案代號>/handoffs/`（進版控），不再放 repo 根目錄。舊史料保留原檔名遷入 handoffs/。
+- **套件層主表**：本卡的規則已升級為 ai-dev-skills 獨立 skill `handoff/`，跨專案 universal 記憶卡見 [[workflow_handoff_convention]] 於 `~/Karen_Memory/Dev_Memory/workflows/`。原文仍為本專案首份交接規則的歷史根源，保留供追溯。

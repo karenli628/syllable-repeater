@@ -684,7 +684,9 @@ sequenceDiagram
 |--------|----------|-------------------|------|
 | `ERR_UNSUPPORTED_FORMAT` | AnalysisPipeline | 「不支援的音檔格式（支援 mp3/wav/m4a/flac）」 | 阻斷 |
 | `ERR_FILE_TOO_LONG` | AnalysisPipeline | 「音檔超過 10 分鐘上限」 | 阻斷 |
-| `ERR_DECODE_FAILED` | AnalysisPipeline | 「無法解碼，檔案可能損毀」 | 阻斷、可重試 |
+| `ERR_DECODE_FAILED` | AnalysisPipeline / FFmpeg wrapper | 「無法解碼，檔案可能損毀」 | 阻斷、可重試 |
+| `ERR_TRANSCRIBE_FAILED` | whisper.cpp wrapper | 「辨識失敗，可重試」 | 可重試；已完成階段保留（M4） |
+| `ERR_SEPARATE_FAILED` | demucs.cpp wrapper | 「人聲分離失敗，可跳過分離重試」 | 可重試；可降級跳過分離用原音（M4） |
 | `ERR_SIDECAR_CRASHED` | SidecarRunner | 「分析引擎異常結束，可重試」 | 可重試；已完成階段保留（M4） |
 | `ERR_SIDECAR_TIMEOUT` | SidecarRunner | 「分析逾時，可重試或調高逾時設定」 | 可重試 |
 | `ERR_ANALYSIS_IN_PROGRESS` | AnalysisPipeline | 「分析進行中」 | 重入拒絕（AT-01-05） |

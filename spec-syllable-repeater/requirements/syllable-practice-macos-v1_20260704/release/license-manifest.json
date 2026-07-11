@@ -140,6 +140,53 @@
       "source": "pub.dev/packages/record"
     },
     {
+      "name": "flutter_secure_storage",
+      "category": "flutter-package",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/flutter_secure_storage",
+      "notes": "Used only for AI key storage through macOS Keychain; no key is stored in DB, pack, or logs."
+    },
+    {
+      "name": "flutter_secure_storage_darwin",
+      "category": "flutter-package-transitive",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart/Swift",
+      "linking": "n/a",
+      "source": "pub.dev/packages/flutter_secure_storage_darwin"
+    },
+    {
+      "name": "flutter_secure_storage_platform_interface",
+      "category": "flutter-package-transitive",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/flutter_secure_storage_platform_interface"
+    },
+    {
+      "name": "http",
+      "category": "dart-package",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/http",
+      "notes": "Used only by OpenAiResponsesClient behind Domain AIService HTTPS allowlist, rate limit, and prompt guard."
+    },
+    {
+      "name": "http_parser",
+      "category": "dart-package-transitive",
+      "license": "BSD-3-Clause",
+      "distribution": "bundled",
+      "language": "Dart",
+      "linking": "n/a",
+      "source": "pub.dev/packages/http_parser"
+    },
+    {
       "name": "FFmpeg release build",
       "category": "sidecar",
       "license": "LGPL-2.1-or-later",
@@ -148,6 +195,16 @@
       "linking": "dynamic",
       "source": "https://ffmpeg.org/legal.html",
       "notes": "Release build must be LGPL-only and dynamically linked; Homebrew GPL build is dev-only."
+    },
+    {
+      "name": "LAME libmp3lame",
+      "category": "sidecar-transitive",
+      "license": "LGPL-2.1-or-later",
+      "distribution": "bundled",
+      "language": "C",
+      "linking": "dynamic",
+      "source": "https://lame.sourceforge.io/",
+      "notes": "Used only as FFmpeg's dynamic MP3 encoder dependency for PracticeExporter; LAME decoding code is not used."
     },
     {
       "name": "whisper.cpp",

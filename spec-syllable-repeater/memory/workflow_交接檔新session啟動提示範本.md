@@ -53,4 +53,11 @@ confidence: high
 status: active
 verified_count: 1
 created: 2026-07-06
-last_used: 2026-07-06
+last_used: 2026-07-07
+
+## 升級 2026-07-07（不改原文，僅補新規範連結）
+
+- **新增第 9 段**：原 8 段結構後新增第 9 段「給人類貼給下一個 agent 的可複製提示詞」，用 ```` ```text ``` ```` fenced code block 圍住整段可複製全文；人類複製即可讓新 session agent 冷啟動接手。同時附第 10 段「接續應有階段/流程的工作項目清單」（引用 task-split 編號＋一句白話），供人類決策要不要接手。
+- **路徑段更新**：原範本中「請先讀 `02_Memory/constitution.md`...」應改為「請先讀 `~/Karen_Memory/Dev_Memory/constitution.md`...（若不存在則回退舊路徑 `<工作區>/02_Memory/`，相容期至 2026-09-07）」。
+- **套件層主表**：本卡的範本已升級為 ai-dev-skills 獨立 skill 的 `references/handoff-template.md`，跨專案 universal 記憶卡見 [[workflow_handoff_convention]] 於 `~/Karen_Memory/Dev_Memory/workflows/`。原文為本專案首次落實 8 段範本的歷史根源，保留供追溯。
+- **首份落實**：`spec-syllable-repeater/handoffs/交接檔-20260707-03-fullstack-code-review_修繕+skills編修+改名.md`（dogfooding 新規範）。

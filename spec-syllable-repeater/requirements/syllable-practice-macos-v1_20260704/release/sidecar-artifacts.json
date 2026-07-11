@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "name": "ffmpeg-lgpl-shared-suite",
+      "license": "LGPL-2.1-or-later",
+      "linking": "dynamic",
+      "dest": ".local-tools/release-sidecars/ffmpeg/bin/ffmpeg",
+      "manualBuild": {
+        "sourceUrl": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+        "sourceSha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+        "expectedLocalPath": ".local-tools/release-sidecars/ffmpeg/bin/ffmpeg",
+        "commands": [
+          "下載 FFmpeg 8.1.2 官方 source tarball 與 .asc，確認 tarball SHA-256=464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c；若本機有 gpg，另依 ffmpeg.org release verification 驗證 .asc。",
+          "在不含空白的 build 路徑以 ./configure --prefix=.local-tools/release-sidecars/ffmpeg --enable-shared --disable-static --disable-gpl --disable-nonfree --enable-libmp3lame 建置。",
+          "確認 .local-tools/release-sidecars/ffmpeg/bin/ffmpeg -version 含 --enable-shared 且不含 --enable-gpl/--enable-nonfree。"
+        ]
+      }
+    },
+    {
+      "name": "ffprobe-lgpl-shared-suite",
+      "license": "LGPL-2.1-or-later",
+      "linking": "dynamic",
+      "dest": ".local-tools/release-sidecars/ffmpeg/bin/ffprobe",
+      "manualBuild": {
+        "sourceUrl": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+        "sourceSha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+        "expectedLocalPath": ".local-tools/release-sidecars/ffmpeg/bin/ffprobe",
+        "commands": [
+          "同 ffmpeg-lgpl-shared-suite；ffprobe 由同一 LGPL shared FFmpeg build 產生。",
+          "確認 .local-tools/release-sidecars/ffmpeg/bin/ffprobe -version 含 --enable-shared 且不含 --enable-gpl/--enable-nonfree。"
+        ]
+      }
+    },
+    {
+      "name": "demucs.cpp.main",
+      "license": "MIT",
+      "linking": "n/a",
+      "dest": ".local-tools/demucs.cpp/build/demucs.cpp.main",
+      "manualBuild": {
+        "sourceUrl": "https://github.com/sevagh/demucs.cpp/tree/v0.0.4-alpha",
+        "sourceCommit": "84e62f07ff77c5058a3493f7f9702cde606dae76",
+        "expectedLocalPath": ".local-tools/demucs.cpp/build/demucs.cpp.main",
+        "commands": [
+          "git clone --recurse-submodules --branch v0.0.4-alpha https://github.com/sevagh/demucs.cpp .local-tools/demucs.cpp/src",
+          "git -C .local-tools/demucs.cpp/src rev-parse HEAD 必須等於 84e62f07ff77c5058a3493f7f9702cde606dae76",
+          "cmake -S .local-tools/demucs.cpp/src -B .local-tools/demucs.cpp/build -DCMAKE_BUILD_TYPE=Release",
+          "cmake --build .local-tools/demucs.cpp/build --target demucs.cpp.main"
+        ]
+      }
+    },
+    {
+      "name": "htdemucs-4s-ggml-model",
+      "license": "MIT",
+      "linking": "n/a",
+      "dest": ".local-tools/demucs.cpp/ggml-demucs/ggml-model-htdemucs-4s-f16.bin",
+      "sources": [
+        {
+          "url": "https://huggingface.co/datasets/Retrobear/demucs.cpp/resolve/main/ggml-model-htdemucs-4s-f16.bin",
+          "sha256": "72b17c42d308982ddb5069bc3bf48b81a5aac4cb6516e4366c0fa7cef6df0064"
+        }
+      ]
+    }
+  ]
+}

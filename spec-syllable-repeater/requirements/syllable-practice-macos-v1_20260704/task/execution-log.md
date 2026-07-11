@@ -5,18 +5,18 @@
 ## 執行概覽
 
 - **開始時間**：2026-07-04（本 session）
-- **目前切片**：S1a（後端 3.1–3.5 與 8.1 本地 CI-ready 防線已完成；前端 FP0/FP2 於 2026-07-05 收尾：真 `AnalysisPipeline` 注入、`FfprobeDurationProbe` 前置時長檢查、`PipelineCheckpoint` 分階段重試、done 導向 editor 最小殼、`shared/player/player_bar.dart` 皆落地；S1a 全切片 code 面已可宣告完成，真 e2e demo 待使用者手動 `flutter run -d macos` 驗收；`hard-guardrails matrix` 仍待補）
-- **環境**：macOS 14（Darwin 23.1.0）／Intel i5-8259U／Homebrew ✅／Xcode CLT ✅／完整 Xcode ❌（Flutter macOS 建置階段才需要，屆時須使用者自 App Store 安裝）
+- **目前切片**：S6 / release 收尾（2.1 release sidecar physical staging、7.2 真 Keychain/HTTP adapter、9.1 x86_64 release build、9.2 unsigned zip、`project-archive`、`ops-monitoring` 已完成；下一步為使用者端 Gatekeeper/GUI smoke 或提交版控）
+- **環境**：macOS 14.1.2（Darwin 23.1.0）／Intel i5-8259U／Homebrew ✅／Xcode CLT ✅／完整 Xcode 15.4 ✅
 
 ## 環境安裝紀錄
 
 | 項目 | 狀態 | 備註 |
 |------|------|------|
 | Dart SDK | ✅ 3.12.2（brew，dart-lang/dart tap 已 trust） | PATH：`/usr/local/opt/dart/libexec/bin` |
-| Flutter SDK | ✅ 3.44.4 stable（Homebrew） | `flutter create --platforms=macos --project-name syllable_repeater_app app` 已建立 `app/`；Android SDK 缺失屬目前 Non-scope；完整 Xcode/CocoaPods 仍可能阻塞 macOS plugin/build |
+| Flutter SDK | ✅ 3.44.4 stable（Homebrew） | `flutter create --platforms=macos --project-name syllable_repeater_app app` 已建立 `app/`；Android SDK 缺失屬目前 Non-scope；2026-07-11 發現 `gen_snapshot_x64` quarantine 會卡 release AOT，移除該 xattr 後 build 通過 |
 | FFmpeg | ✅ 8.1.2（brew）**僅限開發測試** | **brew 為 GPL build，不得隨 App 發布；發布須依任務 2.1 改用 LGPL build（M9）** |
-| cmake / whisper.cpp / demucs.cpp | cmake ✅ 4.3.4；whisper.cpp ✅（`.local-tools` dev build）；demucs.cpp 未安裝 | whisper `small.en` 已下載；Intel Mac 開發期使用 16k WAV＋`--no-gpu`；demucs.cpp LICENSE 未核對（S1c 前必核） |
-| 完整 Xcode | 未安裝 | 任務 9.1 前需使用者自行安裝（App Store，~12GB） |
+| cmake / whisper.cpp / demucs.cpp | cmake ✅ 4.3.4；whisper.cpp ✅（`.local-tools` dev/release build）；demucs.cpp ✅（v0.0.4-alpha x86_64 本機 build） | whisper `small.en` 已下載；Intel Mac 開發期使用 16k WAV＋`--no-gpu`；demucs.cpp LICENSE = MIT，release binary/model 已 staging |
+| 完整 Xcode | ✅ 15.4（Build 15F31d） | 已支援 `flutter build macos --release` |
 
 ## 任務執行記錄
 
@@ -750,6 +750,176 @@
   - 實際 dry-run：`python3 scripts/prepare_release_sidecars.py ... --dry-run` 對目前本機狀態正確失敗，因 `.local-tools/demucs.cpp/build/demucs.cpp.main` 與 `ggml-model-htdemucs-4s-f16.bin` 不存在；另 `/usr/local/bin/ffmpeg -version` 顯示 `--enable-gpl`，只能作 dev-only，不得進 release bundle。
 - **後續校正（2026-07-07）**：依 sevagh/demucs.cpp 官方 README（`https://raw.githubusercontent.com/sevagh/demucs.cpp/main/README.md`），真 CLI 是 `demucs.cpp.main <model-file> <input-audio> <out-dir>`，4-source htdemucs vocals 輸出為 `target_3_vocals.wav`；已同步 `DemucsCppVocalSeparator`、SidecarPaths、release staging script、Release build phase、測試與文件。此校正只修正 S1c/2.1 的真 artifact contract，不改已完成的降級策略。本地 `bash scripts/ci_core_checks.sh` 再次通過（domain 82/82、infra 67/67、app 59/59、`flutter analyze` No issues）。
 - **結論**：2.1 的可程式化防線已落地；實體 x86_64 sidecar bundle 必須等 LGPL-only FFmpeg/ffprobe（dynamic/shared）與 demucs.cpp binary/model artifacts 就緒後再跑 staging，屆時才能勾選 2.1 完成並進入 9.1 release build。
+
+## Task S6-15（2.1 release sidecar artifact fetch gate）— 2026-07-07
+
+### Sidecar 工件取得防線
+- **狀態**：Partial（下載/盤點腳本與單元測試已落地；來源 URL/SHA 尚待使用者確認，實體 release bundle 仍缺）
+- **產物（新增/修改）**：
+  - `scripts/fetch_sidecar_artifacts.py`：manifest 驅動的 sidecar 工件下載與盤點腳本；每個可下載工件必須宣告 URL＋SHA-256＋授權，且只接受 HTTPS 憑證正常驗證；拒絕 TLS/CERT 驗證降級欄位、GPL/AGPL/非商用授權與 LGPL static artifact。若 demucs.cpp 沒有核可官方二進位來源，改列出 upstream 本機編譯指令並檢查預期本機產物。
+  - `scripts/test_fetch_sidecar_artifacts.py`：覆蓋 LGPL dynamic 允許、缺 SHA-256 拒絕、非 HTTPS 拒絕、TLS/CERT 降級拒絕、GPL/static LGPL 拒絕、demucs manualBuild contract、prepare command 使用 `demucs.cpp.main`。
+  - `scripts/ci_core_checks.sh`：CT-09 unittest 清單納入 `scripts/test_fetch_sidecar_artifacts.py`。
+  - `release/release-checklist.md`、`app/macos/Runner/Resources/sidecar/README.md`、`docs/codex/commands.md`：補「先 fetch/inventory，再 prepare staging」操作順序。
+  - `guardrails/hard-limits-matrix.md`：#12 Dependency Scanning 與 #29 Deployment Gate 補列 `fetch_sidecar_artifacts.py` 與單測為落地位置。
+- **實測結果**：
+  - `python3 -m unittest scripts/test_fetch_sidecar_artifacts.py` ✅（7 tests）
+  - `python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py scripts/test_fetch_sidecar_artifacts.py` ✅（15 tests；`test_prepare_release_sidecars.py` 內 GPL ffmpeg 拒絕訊息為預期 stderr）
+  - `python3 scripts/check_licenses.py spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/release/license-manifest.json` ✅（19 components）
+  - `python3 scripts/fetch_sidecar_artifacts.py --inventory-only` ✅/預期 fail-closed：whisper-cli、`ggml-small.en.bin`、CMUdict 已存在；release-safe FFmpeg/ffprobe、demucs.cpp.main、htdemucs model 缺件，因此 exit 1。
+  - `python3 scripts/prepare_release_sidecars.py ... --dry-run` ✅/預期 fail-closed：因 `.local-tools/demucs.cpp/build/demucs.cpp.main` 與 `ggml-model-htdemucs-4s-f16.bin` 不存在而 exit 1，未進入 staging copy。
+  - `python3 scripts/check_guardrails.py .../hard-limits-matrix.md .../decision-log.md` ✅（37 items：8 IMPLEMENTED / 19 PARTIAL / 10 APPROVED_NOT_APPLICABLE）
+  - `PYTHONPYCACHEPREFIX=/private/tmp/syllable_pycache python3 -m py_compile scripts/fetch_sidecar_artifacts.py scripts/test_fetch_sidecar_artifacts.py` ✅；未設 `PYTHONPYCACHEPREFIX` 時 macOS Python 會嘗試寫 `~/Library/Caches`，在 sandbox 內被拒，屬環境寫入位置問題。
+- **阻塞點**：
+  - 來源 URL 與 SHA-256 選定前須先列候選與授權證據，等待使用者確認後才能寫入 `release/sidecar-artifacts.json`。
+  - 本機仍缺 release-safe LGPL shared FFmpeg/ffprobe 與 demucs.cpp.main/model；`scripts/fetch_sidecar_artifacts.py --inventory-only` 預期會 fail-closed。
+- **結論**：artifact acquisition gate 已補上，但 2.1 仍不可勾選；下一步是由使用者確認 LGPL shared FFmpeg/ffprobe 來源與 SHA-256，或提供本機已編譯/下載的 artifacts 後重跑 fetch/inventory → prepare dry-run → prepare staging。
+
+## Task S6-16（2.1 release sidecar physical staging）— 2026-07-07
+
+### SidecarReleaseStaging 實體工件補齊
+- **狀態**：Done（2.1 勾選完成；9.1 release build / 9.2 打包說明仍未開始）
+- **FFmpeg/ffprobe**：
+  - 來源：FFmpeg 8.1.2 官方 source tarball `https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz`。
+  - source pin：SHA-256 `464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c`，已寫入 `release/sidecar-artifacts.json` 的 `sourceSha256`。本機無 `gpg`，`.asc` 已保留但未做 PGP 驗章。
+  - build：在無空白 tmp path configure/make/install，configure 含 `--enable-shared --disable-static --disable-gpl --disable-nonfree --enable-libmp3lame`；將 `bin/`、FFmpeg shared dylib 與 dynamic `libmp3lame.0.dylib` staging 到 `.local-tools/release-sidecars/ffmpeg/`。
+  - 驗證：`ffmpeg -version` / `ffprobe -version` 無 GPL/nonfree，`otool -L` 顯示 staged binary 使用 `@rpath/libav*.dylib` 與 `@rpath/libmp3lame.0.dylib`，非 `/usr/local/bin/ffmpeg`。
+- **demucs.cpp/model**：
+  - 來源：`sevagh/demucs.cpp` `v0.0.4-alpha`，source pin commit `84e62f07ff77c5058a3493f7f9702cde606dae76`；submodules 依 upstream checkout。
+  - build：`cmake -S .local-tools/demucs.cpp/src -B .local-tools/demucs.cpp/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5`，再 `cmake --build ... --target demucs.cpp.main`。
+  - 驗證：`file demucs.cpp.main` = Mach-O x86_64；`otool -L` 只連系統 `Accelerate.framework`、`libc++`、`libSystem`；CLI usage 為 `demucs.cpp.main <model file> <wav file> <out dir>`。
+  - 模型：`ggml-model-htdemucs-4s-f16.bin` 由 `Retrobear/demucs.cpp` 下載，SHA-256 `72b17c42d308982ddb5069bc3bf48b81a5aac4cb6516e4366c0fa7cef6df0064` 驗證通過。
+- **產物（新增/修改）**：
+  - `release/sidecar-artifacts.json`：新增官方 source/manual build contract，manualBuild 也要求 `sourceSha256` 或 `sourceCommit`。
+  - `scripts/fetch_sidecar_artifacts.py` / `scripts/test_fetch_sidecar_artifacts.py`：修正 partial download resume mode，補 manualBuild source pin 驗證。
+  - `scripts/prepare_release_sidecars.py` / `scripts/test_prepare_release_sidecars.py`：staging 時保留 dylib symlink、修補 Mach-O bundle rpath/install name，canonical dylib id 保留 major version。
+  - `release/license-manifest.json`：補 `LAME libmp3lame`（LGPL dynamic）。
+  - `release/release-checklist.md`、`task-split.md`、`hard-limits-matrix.md`、project memory：同步 2.1 實體 staging 完成事實。
+- **本機 staging 結果**：
+  - `python3 scripts/fetch_sidecar_artifacts.py --inventory-only` ✅（全部工件存在）
+  - `python3 scripts/prepare_release_sidecars.py ... --dry-run` ✅
+  - `python3 scripts/fetch_sidecar_artifacts.py --run-prepare` ✅，輸出 `app/macos/Runner/Resources/sidecar/sidecar-manifest.json` 與約 581M 本機 staging 工件；實體 binaries/models/dictionaries 被 `app/macos/Runner/Resources/sidecar/.gitignore` 排除，不進版控。
+  - `python3 scripts/check_licenses.py spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/release/license-manifest.json` ✅（20 components）
+  - `python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py scripts/test_fetch_sidecar_artifacts.py` ✅（19 tests；GPL FFmpeg 拒絕訊息為預期 stderr）
+  - `bash scripts/ci_core_checks.sh` ✅（非 sandbox 執行；guardrails 37 items、license 20 components、Python 19 tests、domain 82/82、infra 69/69、app 61 passed + 1 skip、`flutter analyze` No issues）
+- **結論**：2.1 的 acquisition gate、license gate、physical sidecar staging 已收齊。下一階段可切 7.2（真 Keychain/HTTP adapter）或 9.1（macOS release build；需先處理 entitlements `app-sandbox: false` 並確認 staging manifest 存在）。
+
+## Task S6-17（7.2 true Keychain + OpenAI Responses adapter）— 2026-07-08
+
+### AIService 真 adapter 接線
+- **狀態**：Done（7.2 勾選完成；自動翻譯 UI source 流尚未啟用，避免 AI 結果誤存為 manual）
+- **官方契約依據**：
+  - OpenAI Responses API `create` 支援文字輸入（`input` 可為 string 或 message/content list）與回傳 `output_text` / `output[].content[].text`。
+  - OpenAI Models 頁建議低延遲/低成本使用 mini 族系；本輪預設 model 採 `gpt-5.4-mini`，config 仍隔離於 `AiProviderConfig`，後續可替換服務商或 model 而不動 Domain。
+- **產物（新增/修改）**：
+  - `app/lib/shared/infra/keychain_secure_store.dart`：`flutter_secure_storage` macOS Keychain adapter，實作 Domain `SecureStore`；失敗轉 `ERR_AI_CALL_FAILED`，錯誤訊息不含 credential。
+  - `app/lib/shared/infra/openai_responses_client.dart`：OpenAI Responses API `AiClient` adapter；request body 只含 `model`、`instructions`、`targetLang/text`，credential 僅放 Authorization header；解析 top-level `output_text` 與 `output[].content[].text`；provider failure 包成 `ERR_AI_CALL_FAILED` 且不洩 key。
+  - `app/lib/features/progress/ai_settings_service.dart`：正式 provider 移除 `InMemoryAiSecureStore` / `NoopAiClient`，改 `KeychainSecureStore` + `OpenAiResponsesClient` + `https://api.openai.com/v1/responses` / `gpt-5.4-mini`。
+  - `app/pubspec.yaml` / `pubspec.lock`：新增 `flutter_secure_storage`、`http` 及其 transitive。
+  - `release/license-manifest.json`：新增 `flutter_secure_storage`、`flutter_secure_storage_darwin`、`flutter_secure_storage_platform_interface`、`http`、`http_parser`，皆 BSD-3-Clause。
+  - `guardrails/hard-limits-matrix.md`：#20/#22/#23/#31 由 PARTIAL 轉 IMPLEMENTED；#11/#19/#34/#36 補 Keychain/HTTP adapter 證據但保留 PARTIAL 原因。
+  - `task-split.md`：7.2 勾選完成並補完成註記。
+- **驗證**：
+  - `cd app && flutter test test/shared/ai_adapters_test.dart` ✅（6 tests：Keychain wrapper、Responses output parsing、provider failure 不洩 key、provider 預設接線）
+  - `cd app && flutter test test/progress/progress_ui_test.dart` ✅（14 tests：AI key UI 送出即清空與 S6 round-trip 未受影響）
+- **過程修正**：
+  - 第一次並行跑兩個 Flutter test 互搶 startup lock/native asset 產物而失敗；改單跑通過。後續 Flutter 指令避免並行。
+  - 測試 fake response 用 `http.Response(String)` 塞中文會因預設 latin1 編碼失敗；改 `Response.bytes(utf8.encode(...), headers: application/json; charset=utf-8)`。
+- **結論**：7.2 的真 Keychain 與真 provider HTTP adapter 已收齊。所有真 AI 外呼必經 Domain `AIService` 的 HTTPS allowlist、rate limit、prompt-injection guard 與 audit sink；手動譯文路徑仍永遠可用且不受 provider 失敗阻斷。
+
+## Task S6-18（9.1/9.2 release build gate prep + unsigned zip tooling）— 2026-07-08
+
+### macOS release build 前置核對
+- **狀態**：Historical Partial / 已於 2026-07-11 S6-20 解除（當時 9.1 release build 實跑被工具 escalation 用量限制拒絕；9.2 zip 實產等待 release `.app`）
+- **已完成**：
+  - `app/macos/Runner/DebugProfile.entitlements` / `Release.entitlements`：`com.apple.security.app-sandbox` 已依使用者拍板改 `false`；未加入 `temporary-exception.files.absolute-path.*`。
+  - `python3 scripts/fetch_sidecar_artifacts.py --inventory-only` ✅：release-safe FFmpeg/ffprobe、whisper-cli/model、CMUdict、demucs.cpp.main/model 皆存在。
+  - `python3 scripts/prepare_release_sidecars.py ... --dry-run` ✅：staging plan 完整。
+  - `app/macos/Runner/Resources/sidecar/`：`sidecar-manifest.json`、bin/lib/models/data 必要檔存在；實體 artifacts 仍由 `.gitignore` 排除不進版控。
+  - `otool -L app/macos/Runner/Resources/sidecar/bin/ffmpeg`：使用 `@rpath/libav*.dylib` 與 `@rpath/libmp3lame.0.dylib`，未使用 `/usr/local/bin/ffmpeg`。
+  - `otool -L app/macos/Runner/Resources/sidecar/bin/demucs.cpp.main`：只連系統 `Accelerate.framework`、`libc++`、`libSystem`。
+- **blocked**：
+  - `cd app && flutter build macos --release` 以 `require_escalated` 執行時，Codex 自動審核回覆用量限制拒絕（訊息要求不可用 workaround/間接方式達成同結果）。本輪未繞路執行同等 build，9.1 維持未勾選。
+  - 後續狀態：2026-07-11 已定位真正 release build 卡點為 Flutter SDK `gen_snapshot_x64` quarantine，移除 xattr 後 release build 通過；見 S6-20。
+
+### unsigned zip tooling
+- **已完成**：
+  - `scripts/make_release_zip.py`：先 fail-closed 檢查 release `.app` 與 sidecar 必要檔，再用 `/usr/bin/ditto -c -k --sequesterRsrc --keepParent` 打 `dist/SyllableRepeater-macos-x86_64-unsigned.zip`，並寫 `.sha256`。
+  - `scripts/test_make_release_zip.py`：3 tests 覆蓋 valid dry-run、missing sidecar fail-closed、fake ditto packaging + sha256 file。
+  - `scripts/ci_core_checks.sh`：Python unittest 清單納入 `scripts/test_make_release_zip.py`。
+  - `release/README-unsigned-macos.md`：補使用者右鍵打開與 `xattr -cr` 說明、發布者打包步驟與 M9 注意事項。
+  - `release/release-checklist.md`、`task-split.md`、`hard-limits-matrix.md`：同步 9.1/9.2 當前狀態。
+- **驗證**：
+  - `python3 -m unittest scripts/test_make_release_zip.py` ✅（3 tests）
+  - `PYTHONPYCACHEPREFIX=/private/tmp/syllable_pycache python3 -m py_compile scripts/make_release_zip.py scripts/test_make_release_zip.py` ✅
+  - `python3 scripts/make_release_zip.py --dry-run` 對預設 release app 正確 fail-closed：`release app 不存在 .../Release/syllable_repeater_app.app`（因 9.1 build 尚 blocked）
+- **結論**：9.1 的前置與 sidecar/release gate 已備齊，但 release build 實跑被工具層阻擋；9.2 的腳本/README/gate 已完成，實際 zip 需等 9.1 產出 release `.app` 後執行。
+
+## Task S6-19（code-knowledge-init baseline for archive）— 2026-07-08
+
+### knowledge/code 基線補齊
+- **狀態**：Done（project-archive 前置的 code knowledge 已補；project-archive / ops-monitoring 因 release build 尚未通過，未宣告完成）
+- **產物（新增）**：
+  - `spec-syllable-repeater/knowledge/code/syllable-repeater/scan-plan.md`：記錄本專案為 Flutter/Dart 本機一體化專案，掃描 `app/lib` 32 檔、`packages/domain/lib` 37 檔、`packages/infra/lib` 18 檔；明確 0 REST Controller、0 自家 HTTP API。
+  - `spec-syllable-repeater/knowledge/code/syllable-repeater/frontend-project.md`：前端功能模組、核心流程、模組依賴、OpenAI provider 呼叫、目錄與技術堆疊。
+  - `spec-syllable-repeater/knowledge/code/syllable-repeater/backend-project.md`：本機後端視角（Domain/Infra/Sidecar/DB/AI）之分層、模組、核心流程與 M1-M10 規則摘要。
+  - `spec-syllable-repeater/knowledge/code/syllable-repeater/backend-interface.md`：列出 0 REST API，改以 Dart ports、Riverpod entrypoints、sidecar CLI contracts 與 OpenAI HTTPS provider 作為本機契約。
+  - `spec-syllable-repeater/knowledge/code/syllable-repeater/backend-database.md`：依 DDL + Drift table 定義全量列出 6 張表與 ER 關係。
+  - `spec-syllable-repeater/knowledge/code/syllable-repeater/backend-external-dependency.md`：列 OpenAI Responses API、Keychain、FFmpeg/ffprobe、whisper.cpp、demucs.cpp、CMUdict、SQLite/Drift、檔案系統、錄音與播放依賴。
+- **驗證**：
+  - 新增 6 份 `.md` 皆以 `// AI-Generate` 為第一行 ✅
+  - 掃描文件無 `TODO` / `待補` / `[需人工確認]` 占位 ✅
+  - `backend-database.md` 全量列出 `lesson_registry`、`practice_group`、`srs_state`、`attempt`、`app_settings`、`audit_log` ✅
+- **結論**：`knowledge/code` 前置已補齊，可供後續 `project-archive` 使用；2026-07-08 當輪因 9.1 release build 與 full `ci_core_checks.sh` 被工具 escalation 用量限制阻擋，未宣告 archive 或 ops monitoring 完成。後續已於 2026-07-11 S6-20/S6-21 完成 release build、full CI、archive 與 ops。
+
+## Task S6-20（9.1/9.2 release build + unsigned zip completion）— 2026-07-11
+
+### macOS x86_64 release build 與未簽章打包
+- **狀態**：Done（9.1 / 9.2 已勾選完成；完整 `bash scripts/ci_core_checks.sh` 已通過）
+- **Release build 修復**：
+  - `flutter build macos --release` 首次在 sandbox 內因 Flutter SDK cache 寫入 `/usr/local/share/flutter/bin/cache/engine.stamp` 被擋；改提權執行後，AOT 階段 `gen_snapshot_x64` 被 exit -9 或 0% CPU / 40K RSS 卡住。
+  - 乾淨 `flutter clean` + `flutter pub get` 後仍復現，且 `gen_snapshot_x64 --version` / `--help` 本體也會無輸出卡住；`sample` 顯示 unknown frame、physical footprint 40K。
+  - `xattr -l /usr/local/share/flutter/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_x64` 發現 `com.apple.quarantine: ... Homebrew Cask`；移除該 xattr 後 `gen_snapshot_x64 --version` 正常回應 Dart SDK 3.12.2。
+  - `flutter build macos --release --no-pub` ✅，產出 `app/build/macos/Build/Products/Release/syllable_repeater_app.app`（634MB）。
+- **x86_64 / sidecar / M9 核對**:
+  - `file app/build/macos/Build/Products/Release/syllable_repeater_app.app/Contents/MacOS/syllable_repeater_app` = Mach-O 64-bit executable x86_64。
+  - `app/macos/Runner/Configs/Release.xcconfig` 固定 `ARCHS = x86_64`、`ONLY_ACTIVE_ARCH = YES`，符合 v1 不做 Apple Silicon/universal binary 的 Non-scope。
+  - bundle 內 `Contents/Resources/sidecar/` 包含 `sidecar-manifest.json`、`bin/ffmpeg`、`bin/ffprobe`、`bin/whisper-cli`、`bin/demucs.cpp.main`、Whisper small.en model、htdemucs model、CMUdict。
+  - bundle 內 `ffmpeg -version` / `ffprobe -version` ✅，configure 含 `--enable-shared --disable-static --disable-gpl --disable-nonfree --enable-libmp3lame`。
+  - `otool -L`：FFmpeg 使用 `@rpath/libav*.dylib` 與 dynamic `@rpath/libmp3lame.0.dylib`；demucs.cpp.main 只連系統 `Accelerate.framework`、`libc++`、`libSystem`。
+  - `python3 scripts/check_licenses.py spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/release/license-manifest.json` ✅（25 components）。
+- **Unsigned zip**:
+  - `python3 scripts/make_release_zip.py --dry-run` ✅（release app 結構完整）。
+  - `python3 scripts/make_release_zip.py` ✅，輸出 `dist/SyllableRepeater-macos-x86_64-unsigned.zip`（524MB）與 `dist/SyllableRepeater-macos-x86_64-unsigned.zip.sha256`。
+  - SHA-256：`38de745c051c7d19f11c254fe0406055979dbca7c4e6c07ef4474f2f670db8a2`。
+  - `unzip -l` 確認 zip 根為 `syllable_repeater_app.app/` 並包含 sidecar 必要檔；`dist/` 已加入 `.gitignore`，發版工件保留本機但不進版控。
+- **中繼結論**：9.1/9.2 的實體 release build、M9 動態連結核對、未簽章 zip 與 Gatekeeper README 已完成；同段後續已補完整 Core CI，並於 S6-21 完成 `project-archive` 與 `ops-monitoring`。
+- **完整 Core CI**：
+  - `bash scripts/ci_core_checks.sh` ✅（以 escalation 執行；sandbox 內 Flutter SDK cache 寫入受限為工具環境限制）
+  - guardrails：37 items 通過（12 IMPLEMENTED / 15 PARTIAL / 10 APPROVED_NOT_APPLICABLE）
+  - CT-09 license gate：25 components 通過
+  - Python unittest：22 tests OK
+  - `flutter test packages/domain/test`：82 passed
+  - `flutter test packages/infra/test`：69 passed + 2 skips
+  - `cd app && flutter test`：67 passed + 1 skip
+  - `flutter analyze`：No issues
+- **結論**：9.1/9.2 的實體 release build、M9 動態連結核對、未簽章 zip、Gatekeeper README 與完整 Core CI 已完成。後續進入 project archive / ops monitoring 收尾。
+
+## Task S6-21（project-archive + ops-monitoring 收尾）— 2026-07-11
+
+### 專案歸檔與交付後監測
+- **狀態**：Done
+- **project-archive 產物**：
+  - `archive/code-archive.md`：彙整需求、前後端實作路徑、介面契約、資料/儲存、release build/zip 驗證與知識庫融合檢查。
+  - `archive/application-archive.md`：彙整匯入→校正→練習→匯出/錄音→課件/進度→release 的應用層呼叫鏈與例外回退。
+  - `archive/business-archive.md`：彙整業務目標、M1-M10 規則、流程、前後端職責與需求追溯矩陣。
+- **knowledge 融合**：
+  - 新增 `knowledge/application/application-overview.md` 與 `knowledge/business/business-overview.md`。
+  - 更新 `knowledge/code/syllable-repeater/frontend-project.md`、`backend-project.md`、`backend-interface.md`、`backend-external-dependency.md`，融合 release/packaging 事實；`backend-database.md` 本輪無 schema 變更，無需更新。
+- **ops-monitoring 產物**：
+  - `ops/monitoring-plan.md`：輕量版本機/單人監測契約，逐條映射 M1-M10 到 CI/巡檢/第一動作。
+  - `ops/patrol-report_20260711.md`：本次 release 深巡報告，結論為 build/zip/CI 通過、0 必修、2 項建議。
+- **結論**：project archive 與 ops monitoring 已完成；仍建議由 Karen 端對 unsigned zip 執行 Gatekeeper/GUI smoke（AT-09-03 使用者端體驗）。
+- **交付前二次 CI 註記**：archive/ops/knowledge/交接檔全部更新後，嘗試再重跑一次 `bash scripts/ci_core_checks.sh`，但 Codex escalation 自動審核回覆 usage limit 並要求不得 workaround，因此未再繞路執行。最後一次完整 Core CI 全綠發生在 release build/zip 完成後、archive/ops 文件收尾前；文件收尾後僅變更 Markdown/交接/記憶檔。
 
 ## e2e 驗收紀錄 — S1a Frontend FP2
 
