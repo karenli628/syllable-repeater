@@ -45,7 +45,11 @@ Future<_BenchmarkReport> _runBenchmark() async {
     '.local-tools/whisper.cpp/models/ggml-small.en.bin',
   ));
   final cmudict = File(p.join(root.path, '.local-tools/cmudict/cmudict.dict'));
-  final sourceAudio = File(p.join(root.path, _sourceAudioName));
+  final sourceAudio = File(p.join(
+    root.path,
+    '.local-tools/fixtures',
+    _sourceAudioName,
+  ));
 
   if (ffmpeg == null) {
     throw StateError('FFmpeg not found at /usr/local/bin or /opt/homebrew/bin');

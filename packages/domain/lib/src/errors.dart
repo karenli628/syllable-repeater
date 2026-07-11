@@ -11,11 +11,13 @@ class DomainException implements Exception {
   String toString() => 'DomainException($code): $message';
 }
 
-/// 錯誤碼常數——與 backend-design.md §3.2.8 一一對應（17 碼）。
+/// 錯誤碼常數——與 backend-design.md §3.2.8 一一對應（19 碼）。
 abstract final class ErrorCodes {
   static const unsupportedFormat = 'ERR_UNSUPPORTED_FORMAT';
   static const fileTooLong = 'ERR_FILE_TOO_LONG';
   static const decodeFailed = 'ERR_DECODE_FAILED';
+  static const transcribeFailed = 'ERR_TRANSCRIBE_FAILED';
+  static const separateFailed = 'ERR_SEPARATE_FAILED';
   static const sidecarCrashed = 'ERR_SIDECAR_CRASHED';
   static const sidecarTimeout = 'ERR_SIDECAR_TIMEOUT';
   static const analysisInProgress = 'ERR_ANALYSIS_IN_PROGRESS';

@@ -96,6 +96,39 @@ void main() {
         _domainError(ErrorCodes.sidecarTimeout),
       );
     });
+
+    test('exit>0 → ERR_TRANSCRIBE_FAILED（I-002 三同步後不再借用 decodeFailed）',
+        () async {
+      final fake = _FakeRunner(
+          (args) async => const SidecarResult(1, [], 'model load failure'));
+      final transcriber = WhisperCppTranscriber(
+        runner: fake,
+        whisperCliPath: 'whisper-cli',
+        modelPath: 'ggml-small.en.bin',
+      );
+
+      await expectLater(
+        transcriber.transcribe('/tmp/audio.wav', outputBasePath: '/tmp/out'),
+        _domainError(ErrorCodes.transcribeFailed),
+      );
+    });
+
+    test('exit=0 但未產生 JSON → ERR_TRANSCRIBE_FAILED', () async {
+      final dir = await Directory.systemTemp.createTemp('whisper-nojson-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final fake = _FakeRunner((args) async => const SidecarResult(0, [], ''));
+      final transcriber = WhisperCppTranscriber(
+        runner: fake,
+        whisperCliPath: 'whisper-cli',
+        modelPath: 'ggml-small.en.bin',
+      );
+
+      await expectLater(
+        transcriber.transcribe('/tmp/audio.wav',
+            outputBasePath: '${dir.path}/out'),
+        _domainError(ErrorCodes.transcribeFailed),
+      );
+    });
   });
 }
 

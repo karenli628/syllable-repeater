@@ -3,18 +3,19 @@
 library;
 
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:domain/domain.dart';
 import 'package:infra/infra.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'test_support/repo_fixture.dart';
+
 /// S1c 真整合測試（task-split 3.8）：`.local-tools/demucs.cpp/` 就緒時對使用者
 /// mp3 跑真 demucs.cpp CLI + FFmpeg 讀回 vocals PCM；缺失即 skip。
 void main() {
   test('S1c demo：真 demucs.cpp 分離出 vocals → 解碼回 PCM 非空', () async {
-    final root = Directory.current.parent.parent;
+    final root = findRepoRoot();
     final ffmpeg = _firstExisting([
       '/usr/local/bin/ffmpeg',
       '/opt/homebrew/bin/ffmpeg',
@@ -27,10 +28,10 @@ void main() {
       root.path,
       '.local-tools/demucs.cpp/ggml-demucs/ggml-model-htdemucs-4s-f16.bin',
     ));
-    final audio = File(p.join(
-      root.path,
-      'step up your coding skills to a new level.mp3',
-    ));
+    final audio = fixtureAudio(
+      'voice and music.mp3',
+      root: root,
+    );
 
     if (ffmpeg == null) {
       markTestSkipped('FFmpeg not installed');
@@ -56,9 +57,10 @@ void main() {
     workRoot.createSync(recursive: true);
 
     const runner = SidecarRunner(defaultTimeout: Duration(seconds: 240));
+    final decoder = FfmpegDecoder(runner: runner, ffmpegPath: ffmpeg.path);
     final separator = DemucsCppVocalSeparator(
       runner: runner,
-      decoder: FfmpegDecoder(runner: runner, ffmpegPath: ffmpeg.path),
+      decoder: decoder,
       demucsCliPath: demucsCli.path,
       modelPath: modelPath.path,
       outputDirectory: workRoot.path,
@@ -68,9 +70,7 @@ void main() {
       audioPath: audio.path,
       separateVocals: true,
     );
-    final decodedPcm = Pcm(await _emptyInt16List(),
-        sampleRate:
-            44100); // pipeline 實際 decodedPcm 不影響 demucs（demucs 用 audioPath）
+    final decodedPcm = await decoder.decode(audio.path);
 
     final result = await separator.separate(request, decodedPcm: decodedPcm);
 
@@ -79,8 +79,8 @@ void main() {
     expect(result.pcm.samples, isNotEmpty);
     expect(result.pcm.sampleRate, 44100);
     expect(result.pcm.durationMs, greaterThan(1000),
-        reason: '3 秒級音檔分離後應仍有數秒 vocals');
-  });
+        reason: '含人聲與音樂的 fixture 分離後應仍有可分析 vocals');
+  }, timeout: const Timeout(Duration(minutes: 5)));
 }
 
 File? _firstExisting(List<String> paths) {
@@ -90,5 +90,3 @@ File? _firstExisting(List<String> paths) {
   }
   return null;
 }
-
-Future<Int16List> _emptyInt16List() async => Int16List(0);

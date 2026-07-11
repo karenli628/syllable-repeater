@@ -133,12 +133,13 @@ class WhisperCppTranscriber {
       final tail = result.stderr.length > 300
           ? result.stderr.substring(result.stderr.length - 300)
           : result.stderr;
-      throw DomainException(ErrorCodes.decodeFailed, '辨識失敗，可重試（$tail）');
+      throw DomainException(ErrorCodes.transcribeFailed, '辨識失敗，可重試（$tail）');
     }
 
     final jsonFile = File('$outputBasePath.json');
     if (!jsonFile.existsSync()) {
-      throw const DomainException(ErrorCodes.decodeFailed, '辨識失敗：未產生 JSON 結果');
+      throw const DomainException(
+          ErrorCodes.transcribeFailed, '辨識失敗：未產生 JSON 結果');
     }
     return parser.parseWords(jsonFile.readAsStringSync());
   }
