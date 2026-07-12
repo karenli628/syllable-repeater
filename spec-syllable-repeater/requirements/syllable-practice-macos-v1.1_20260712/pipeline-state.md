@@ -7,7 +7,7 @@ slice: none
 stage_status: done
 next_skill: hard-guardrails
 open_tasks: none
-blocked_reason: v1 遺留:C6b 六個史料交接檔進版控被 check_handoff 誤攔(hook 缺遷移期豁免,修法待批准)、AT-09-03 release smoke 待使用者親跑
+blocked_reason: v1 遺留:AT-09-03 release smoke 待使用者親跑;工作樹另有 29 檔前序 session 未 commit 變更待使用者裁定
 next_patrol_due: none
 last_handoff: none
 last_updated: 2026-07-12
