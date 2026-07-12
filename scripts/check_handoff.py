@@ -32,6 +32,14 @@ TYPE_RE = re.compile(
 )
 SUFFIX_RE = re.compile(r"_中斷(CTX|USER|BLOCK|SLICE)\.md$")
 ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# 交接檔新規範上線日:此日以前的檔案即使首次 add 亦視為史料,豁免流水號與型別聲明強制
+# (規範文件已承諾,程式碼補齊。2026-07-12 使用者裁定六份舊檔均屬完成型史料)
+LEGACY_HANDOFF_CUTOFF = "20260712"
+
+
+def is_legacy_handoff(name):
+    m = re.match(r"^交接檔-(\d{8})-", name)
+    return m is not None and m.group(1) < LEGACY_HANDOFF_CUTOFF
 STATE_KEYS = ["schema", "project", "requirement", "stage_skill", "slice", "stage_status",
               "next_skill", "open_tasks", "blocked_reason", "next_patrol_due",
               "last_handoff", "last_updated", "updated_by"]
@@ -469,16 +477,19 @@ def run_staged(rep, root):
         if not Path(p).name.startswith("交接檔-"):
             continue
         is_new = status.startswith("A")
-        check_name_and_place(rep, path, root, is_new)
+        legacy = is_legacy_handoff(Path(p).name)
+        # 史料檔案(日期<LEGACY_HANDOFF_CUTOFF)即使首次 add 亦豁免新格式強制
+        enforce_new = is_new and not legacy
+        check_name_and_place(rep, path, root, enforce_new)
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8")
         htype, code, secs = check_content(rep, path, text, root)
-        if htype is None and is_new:
+        if htype is None and enforce_new:
             rep.err(f"{path.name}:新增交接檔必須是新格式(含「> 型別:」聲明行)", "照 handoff-template.md 補型別聲明")
         if htype:
             check_ctx_budget(rep, path, text)
-            if is_new:  # 綁定檢查只針對新增交接檔;修改舊檔(追加後記)走凍結檢查即可
+            if enforce_new:  # 綁定檢查只針對「真正的」新增交接檔;史料與修改舊檔皆豁免
                 check_binding(rep, path, htype, code, secs, root, require_staged=True)
     # 根目錄禁放交接檔(工作衛生)
     for status, p in staged:
