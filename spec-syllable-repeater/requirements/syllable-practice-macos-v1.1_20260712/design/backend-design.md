@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS label_registry (
 
 **檔案格式**
 
-- `.abolabel`（新）：zip 內含 `label.json`——`{ schemaVersion: 1, audioFingerprint, audioDurationMs, language, segments: [{id, startMs, endMs, text, userAdjusted}] }`；讀取全檔驗證後才套用，損毀→`ERR_LABEL_CORRUPTED` 零副作用（同 v1 pack 手法，AT-07-03 同款）。
+- `.abolabel`（新）：zip 內含 `label.json`——`{ schemaVersion: 1, audioFingerprint, audioDurationMs, language, separateVocals: bool, segments: [{id, startMs, endMs, text, userAdjusted}] }`（`separateVocals`＝當時人聲分離開關，重載不重跑分離——O2 使用者 2026-07-12 定案）；讀取全檔驗證後才套用，損毀→`ERR_LABEL_CORRUPTED` 零副作用（同 v1 pack 手法，AT-07-03 同款）。
 - `.abopack` `manifest.json`：schemaVersion 1→**2**；＋`lesson.language`（缺省補 `'en'`）＋`lesson.arrangement`（可 null）。v2 讀 v1 檔＝相容；v1 讀 v2 檔＝拒絕並提示升級（schemaVersion 檢查既有機制）。
 
 #### 3.1.3 狀態機（新增）
@@ -325,14 +325,16 @@ sequenceDiagram
 #### 3.2.5 錄音暫存（RecordingBufferService）｜REQ-18（★M10 補述防線）
 
 ##### 介面 32：`RecordingBufferService.stash`
-- **簽名**：`Future<RecordingBufferEntry> stash(Pcm recording, String attemptContext, {Duration ttl = const Duration(minutes: 30)})`
+- **簽名**：`Future<RecordingBufferEntry> stash(Pcm recording, String attemptContext, {Duration ttl = const Duration(minutes: 10)})`（TTL 10 分鐘＝O4 使用者 2026-07-12 定案；**不曝露於設定頁**）
 - **前置**：**呼叫本介面即代表該次明示同意**（UI 勾選才呼叫；預設不勾＝不呼叫＝v1 用完即刪路徑分毫不變，AT-18-02）。
-- **行為**：寫入暫存白名單目錄（§1.5）；目錄不可寫→`ERR_BUFFER_STASH_FAILED`，錄音照 v1 規則即刪、主流程不受阻（AT-18-06）。
+- **行為**：寫入暫存白名單目錄（§1.5）；**同一 `attemptContext` 已有暫存→新錄音覆蓋舊檔**（同步驟恆最多 1 筆，AT-18-07）；目錄不可寫→`ERR_BUFFER_STASH_FAILED`，錄音照 v1 規則即刪、主流程不受阻（AT-18-06）。
 
-##### 介面 33：`RecordingBufferService.list` / `play` / `delete` / `purgeExpired` / `purgeAll`
-- `list()`：現存未過期 entries（TTL 邊界：`createdAt + ttl` 不含，29:59 可播/30:01 已清，AT-18-04）。
+##### 介面 33：`RecordingBufferService.list` / `play` / `delete` / `purgeContext` / `purgeExpired` / `purgeAll`
+- `list()`：現存未過期 entries（TTL 邊界：`createdAt + ttl` 不含，9:59 可播/10:01 已清，AT-18-04）。
+- `delete(entry)`：手動逐筆刪除，不必等時限（O4）。
+- `purgeContext(attemptContext)`：**切換練習步驟時由 PracticeController 必呼**——前一步驟暫存即刪（O4，AT-18-07）。
 - `purgeExpired()`：惰性＋定時雙觸發；`purgeAll()`：**App 啟動時必呼叫**（重啟即清空，AT-18-05；兼孤兒清掃）。
-- **三保證落點**：①同意＝呼叫語意②TTL＋啟動清空③無 DB 表＋pack/progress byte 掃描測試沿用（結構上不可能持久化）。
+- **三保證落點**：①同意＝呼叫語意②TTL＋切步即清＋啟動清空③無 DB 表＋pack/progress byte 掃描測試沿用（結構上不可能持久化）。
 
 #### 3.2.6 顯示模式偏好｜REQ-19
 
@@ -396,6 +398,6 @@ v1 既有 19 碼全部沿用不動。
 | # | 問題 | 影響 | 待決 |
 |---|---|---|---|
 | O1 | 段落切句 800ms 靜音合併閾值（Q1） | 切句品質 | 實作時實測定案（允許變動） |
-| O2 | `.abolabel` 是否記錄人聲分離開關狀態 | 重載時是否重跑分離 | 建議記錄（欄位 `separateVocals: bool`），實作時定案 |
-| O3 | AI 自動譯文入口是否隨手動譯文搬移（Q4） | 前端佈局 | 階段 B 處理，建議一併搬 |
-| O4 | 暫存 TTL 30 分鐘是否曝露於設定頁（Q5） | 設定頁複雜度 | 建議 v1.1 不曝露（寫死可改），留待使用回饋 |
+| ~~O2~~ | ~~`.abolabel` 是否記錄人聲分離開關狀態~~ | — | **已定案**（2026-07-12 使用者）：記錄 `separateVocals: bool`（§3.1.2） |
+| ~~O3~~ | ~~AI 自動譯文入口是否隨手動譯文搬移~~ | — | **已定案**（2026-07-12 使用者）：一併搬移（F2） |
+| ~~O4~~ | ~~暫存 TTL 曝露設定頁？~~ | — | **已定案**（2026-07-12 使用者）：TTL 10 分鐘、不曝露；＋手動逐筆刪除＋切步即清（介面 32/33） |

@@ -41,5 +41,18 @@ if [ -f scripts/check_handoff.py ] && echo "$STAGED" | grep -qE "(/handoffs/|pip
     python3 scripts/check_handoff.py --staged || exit 1
 fi
 
+# 4) 毀滅性指令掃描（matrix #38 配方 3b，使用者 2026-07-12 批准；只掃 staged 腳本檔避免文件誤報）
+DESTRUCTIVE='rm -rf|rm -r |Remove-Item -Recurse|rmdir /S|git reset --hard|git clean -f|git push --force|git push -f|DROP TABLE|DROP DATABASE|TRUNCATE'
+STAGED_SCRIPTS=$(echo "$STAGED" | grep -E '\.(sh|ps1|sql)$|(^|/)Makefile$' || true)
+if [ -n "$STAGED_SCRIPTS" ]; then
+    HITS=$(echo "$STAGED_SCRIPTS" | tr '\n' '\0' | xargs -0 grep -lnE "$DESTRUCTIVE" 2>/dev/null || true)
+    if [ -n "$HITS" ]; then
+        echo "[pre-commit] ❌ 以下 staged 腳本含毀滅性指令，commit 被擋下（matrix #38）："
+        echo "$HITS"
+        echo "[pre-commit]    人工確認確需保留時，以 --no-verify 放行（放行本身即人工確認動作）。"
+        exit 1
+    fi
+fi
+
 echo "[pre-commit] ✅ 檢查通過。"
 exit 0

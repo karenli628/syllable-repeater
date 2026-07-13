@@ -79,7 +79,7 @@ graph TD
 - **實作方案**：
   - 承接入口：labeling「下一步」→ 以 `pendingSegment` Provider 傳遞（起訖 ms＋文字＋language）→ import_analysis 顯示來源徽章「來自段落標籤：第 N 段」，字稿預填 Segment 文字；分析對象＝該區段原音切片（domain 切片，M1）。
   - 無音檔防呆：無檔且無承接 → 「開始分析」`FilledButton` disabled＋引導文案（AT-12-03；**介面上不存在任何 TTS/生成選項**——D1）。
-  - 譯文搬移（REQ-20）：`_lessonTranslationController` 相關欄位與 `_saveLesson`（含 ⌘S）自 `progress_settings_screen.dart:85,168,178-207` 遷至本頁字稿區塊正下方（同一 `Card` 視覺群組）；AI 自動譯文觸發鈕一併搬入同群組（O3 建議採納，`[需與產品確認]` 已列開放問題）；設定頁僅移除譯文區塊，其餘（含批次「儲存」按鈕）分毫不動（AT-20-02/03）。
+  - 譯文搬移（REQ-20）：`_lessonTranslationController` 相關欄位與 `_saveLesson`（含 ⌘S）自 `progress_settings_screen.dart:85,168,178-207` 遷至本頁字稿區塊正下方（同一 `Card` 視覺群組）；AI 自動譯文觸發鈕**一併搬入同群組**（F2 定案，2026-07-12 使用者）；設定頁僅移除譯文區塊，其餘（含批次「儲存」按鈕）分毫不動（AT-20-02/03）。
 - **使用驅動三題**：①動機＝拿到素材最快開始練；②第一眼＝匯入按鈕或已預填的字稿，1 步到「開始分析」；③阻力點＝不知道為何不能分析——防呆文案直接指路（匯入或去段落標籤）。
 - **資料與介面**：沿用 v1 介面 1（analyze）；無新增。承接資料為 UI 層 Provider 傳遞，不新增 domain 介面。
 
@@ -102,7 +102,7 @@ graph TD
 
 - **功能概述**：一鍵生成 N 列句尾疊加初始排列→列增刪→積木拖曳→圈選組塊→逐塊設定（次數/靜音倍數）→列預覽→獨立撤銷。
 - **元件結構**：`ArrangementSection`（editor 頁下方可捲動區域）＝「一鍵生成」`FilledButton.icon` ＋ 過期提示條（`staleFlag` 時 `MaterialBanner`：重新生成/保留）＋ `ListView` 之 `ArrangementRow[]`——每列：左外緣「−」、列間隙左側「＋」、列內 `DragTarget` 接收上方 chips 的 `Draggable`（積木＝參照 `_SyllableChip` 樣式）、組塊以主色粗框包裹、右側播放預覽鍵；點擊積木/組塊→`PopupMenuButton` 式設定浮層（repeatN Stepper 1–10、靜音倍數 Stepper 0–5，就地驗證超界 disabled——錯誤不清空已填值）；區域頂部獨立撤銷 `IconButton`（作用域僅本區，與上方 ⌘Z 分離）。
-- **圈選**：同列相鄰積木以「長按起點→拖到終點」選取（或 shift+click 區間），選取後浮現「設為組塊」鈕；設計備註：不做跨列圈選（需求無此語意）。
+- **堆疊組塊（F1 定案手勢，2026-07-12 使用者）**：iPhone 主畫面式互動——**長按**積木進入拖曳態（微放大＋陰影，`LongPressDraggable`）；拖曳中懸停於同列另一積木上方 ≥300ms → 目標積木顯示「即將合組」框（主色粗框預覽）→ 放開即合成組塊（如 iPhone App 資料夾）；**點開組塊**（單擊）展開內部橫列，組塊內積木可再滑動排序（同款 `LongPressDraggable` 於組塊內部作用域）；組塊外緣「拆組」鈕＝ungroup。不做跨列堆疊（拖至他列空隙＝移動，拖至他列積木上＝不觸發合組，避免誤操作）。疊錯→本區獨立撤銷回復。
 - **使用驅動三題**：①動機＝針對自己卡住的連音自組練習（掌控感，requirement ④人性驅動）；②第一眼＝按「一鍵生成」即出現熟悉的疊加階梯，0 學習成本起步；③阻力點＝排錯/圈錯——獨立撤銷＋設定就地顯示目前值。
 - **資料與介面**（來源：backend-design.md（v1.1）§3.2.3）：
 
@@ -129,14 +129,14 @@ graph TD
 ### 功能點 15：錄音暫存回聽（practice 擴充）｜REQ-18
 
 - **功能概述**：錄音結束顯示「暫存本次錄音以便回聽」勾選（**預設不勾**）；暫存清單面板（時間｜所屬步驟｜播放｜刪除）。
-- **實作方案**：`RecordPanel` 擴充——錄音結束列尾 `Checkbox`＋說明 tooltip（「30 分鐘後自動刪除；關閉 App 即清空；絕不存入課件」——把 M10 三保證講給使用者聽）；勾選才呼叫介面 32（呼叫即同意語意）；暫存清單 `ExpansionTile` 收於練習頁側欄；暫存失敗→`SnackBar`（`ERR_BUFFER_STASH_FAILED` 文案），主流程不擋。
+- **實作方案**：`RecordPanel` 擴充——錄音結束列尾 `Checkbox`＋說明 tooltip（「10 分鐘後自動刪除；換一步練習即清；關閉 App 即清空；絕不存入課件」——把 M10 保證講給使用者聽）；勾選才呼叫介面 32（呼叫即同意語意；同步驟重錄＝覆蓋）；暫存清單 `ExpansionTile` 收於練習頁側欄，每筆附**刪除鈕**（手動即刪，O4）；`PracticeController` 於切換步驟時呼叫 `purgeContext(前一步驟)`（O4/AT-18-07）；暫存失敗→`SnackBar`（`ERR_BUFFER_STASH_FAILED` 文案），主流程不擋。
 - **使用驅動三題**：①動機＝比對結果怪異想聽自己剛剛錄了什麼；②第一眼＝錄完就在原地看到勾選框，0 額外步驟；③阻力點＝隱私疑慮——tooltip 直接把三保證說清楚。
 - **資料與介面**（來源：backend-design.md（v1.1）§3.2.5）：
 
 | 介面 | 輸入欄位 | 輸出欄位 |
 |---|---|---|
-| 介面 32 `stash` | `recording: Pcm`、`attemptContext: String`、`ttl`(預設 30min) | `RecordingBufferEntry` |
-| 介面 33 `list/play/delete/purgeExpired/purgeAll` | — | entries／void；`purgeAll` 由 `main.dart` 啟動時呼叫 |
+| 介面 32 `stash` | `recording: Pcm`、`attemptContext: String`、`ttl`(預設 10min，O4) | `RecordingBufferEntry`（同 context 覆蓋） |
+| 介面 33 `list/play/delete/purgeContext/purgeExpired/purgeAll` | — | entries／void；`purgeAll` 由 `main.dart` 啟動時呼叫；`purgeContext` 由切步時呼叫 |
 
 ### 功能點 16：顯示模式切換（practice 擴充）｜REQ-19
 
@@ -172,7 +172,7 @@ graph TD
 
 ## 開放問題（前端）
 
-| # | 問題 | 建議 |
+| # | 問題 | 結論 |
 |---|---|---|
-| F1 | 圈選手勢採「長按拖選」或「shift+click 區間」 | 桌面優先建議 shift+click，實作時以操作測試定案（允許變動） |
-| F2 | AI 自動譯文觸發鈕隨手動譯文搬移（O3/Q4） | 建議一併搬入同群組；`[需與產品確認]` |
+| ~~F1~~ | ~~圈選手勢~~ | **已定案**（2026-07-12 使用者）：長按拖曳堆疊（iPhone App 式），疊上即成組、組內滑動排序——見功能點 13 |
+| ~~F2~~ | ~~AI 自動譯文觸發鈕搬移~~ | **已定案**（2026-07-12 使用者）：一併搬入同群組——見功能點 11 |

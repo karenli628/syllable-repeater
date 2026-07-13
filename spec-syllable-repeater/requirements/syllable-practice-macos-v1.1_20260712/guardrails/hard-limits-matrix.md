@@ -19,7 +19,7 @@
 
 | # | 限制 | 白話說明 | 狀態 | 落地位置（檔案/設定/SQL）或補完計畫 | 批准人 | decision-log 編號／備註 |
 |---|------|----------|------|---------------------------|--------|--------------------------|
-| 38 | Destructive Command Guard | 毀滅性指令防護（套件預置）：`rm -rf`、`git reset --hard`、`DROP TABLE` 等一鍵毀資料的指令，AI 執行前必須走四步契約（停下→說明→等同意→給替代），並裝上工具層自動攔截 | BLOCKED | **軟性層已存在**（憲法 C14 四步契約＋destructive-commands.md 字面總表——依 C12 軟性不算落地）。**硬性配方待使用者批准後安裝**：①3a Claude Code `permissions.deny` 規則（擋 `rm -rf*`／`git reset --hard*`／`git clean -f*`／`git push --force*` 等，5 分鐘落地，惟本 repo `.claude/` 在 `.gitignore` 內＝機器本地生效不進版控）②3b pre-commit 掃描 staged 腳本（`.sh/.ps1/.sql/Makefile`）夾帶毀滅性指令（進版控、全 clone 生效）。DB 層 3c 不適用（SQLite 無帳號權限模型，由 #3 結構防線代位） | — | 缺=使用者批准 3a/3b 配方（改 AI 工具權限與 git hook 屬使用者授權範疇）；問誰=使用者。批准後即可當場落地 |
+| 38 | Destructive Command Guard | 毀滅性指令防護（套件預置）：`rm -rf`、`git reset --hard`、`DROP TABLE` 等一鍵毀資料的指令，AI 執行前必須走四步契約（停下→說明→等同意→給替代），並裝上工具層自動攔截 | IMPLEMENTED | ①3a：`.claude/settings.json` `permissions.deny` 8 條規則（rm -rf/-r/-f、sudo rm、git reset --hard、git clean -f、git push --force/-f）——注意 `.claude/` 在 `.gitignore`，屬機器本地防線；②3b：`.githooks/pre-commit` 第 4 段毀滅性指令掃描（staged `.sh/.ps1/.sql/Makefile`，命中即擋，`--no-verify` 放行＝人工確認）——已以夾帶 `rm -rf` 之測試腳本驗證命中、乾淨腳本通過；③軟性層：憲法 C14 四步契約持續有效（雙層並用）。DB 層 3c 不適用（SQLite 無帳號權限模型，由 v1 #3 結構防線代位） | eslite0220@gmail.com（使用者 2026-07-12 批准「裝3a+3b」） | 3a 為本地防線不進版控（換機需重裝，記入 README 待辦）；3b 進版控全 clone 生效 |
 | 39 | M11 Step-Count Invariant Test | 音節總數即當時值：切點增減後，疊加步數必須＝編輯後的實際音節數（金標準 11 僅為未編輯預設）——用測試把這條鎖死 | BLOCKED | 補完計畫：`packages/domain/test/` 新增核心測試——①金標準 11 音節刪 1 切點→`buildSteps` 輸出 10 步（AT-13-07）②增 1 切點→12 步③增減後第 n 步仍=句尾往前 n 個（演算法本身不變）。落點掛在 REQ-13 實作切片 | — | 等 fullstack-design 定 AlignmentEngine 增減 API 簽名後實作；上游 v1 CT-02（固定 11 步）繼續有效不動 |
 | 40 | M12 Arrangement-Override Test | 排列覆蓋規則：無自訂排列→自動句尾疊加；有→使用者排列；刪→回落自動。三態轉換用測試鎖死 | BLOCKED | 補完計畫：`packages/domain/test/` 新增——①無 Arrangement 時 PracticeEngine 輸出=`buildSteps` 結果（AT-16-01/04：第 2 步仍 `tion skills` 不吸附）②有 Arrangement 時輸出=排列各列（AT-16-02）③刪除後回落（AT-16-03）。落點掛在 REQ-15/16 實作切片 | — | M2 演算法不變性（v1 CT-02）與本項雙保險：自訂功能存在不得改變自動模式行為 |
 | 41 | M13 Dual-Port Purity Gate | 雙抽層契約：ASR 引擎與音節切分器都走 Domain port（插座）；新引擎=adapter（插頭），不改 Domain——用依賴方向檢查鎖死 | PARTIAL | **已存在**：`AnalysisTranscriber` port（`packages/domain/lib/src/analysis/analysis_pipeline.dart:129`）＋`domain_purity_test.dart`（Domain 不 import sidecar/UI/平台，15 tests）＋CI 常駐。**補完計畫**：①port 升級為 `TranscriberEngine`（加語言/能力自述）②新增 `Syllabifier` port（現況：CMUdict＋母音團 fallback 寫死在 `alignment_engine.dart:148-163`，未抽層）③`TranscriberRegistry`/`SyllabifierRegistry`④domain_purity_test 擴充覆蓋新 port 檔案。落點掛在 REQ-17 實作切片 | — | v1 抽層已完成一半（Transcriber 有 port、Syllabifier 沒有）；擴充不動既有測試 |
@@ -39,11 +39,11 @@
 
 | 狀態 | 數量 |
 |------|------|
-| IMPLEMENTED | 0 |
+| IMPLEMENTED | 1 |
 | PARTIAL | 4 |
 | NOT_APPLICABLE_PENDING_HUMAN_REVIEW | 0 |
 | APPROVED_NOT_APPLICABLE | 0 |
-| BLOCKED | 9 |
+| BLOCKED | 8 |
 | REJECTED_NEEDS_IMPLEMENTATION | 0 |
 | NOT_REVIEWED（交付前必須為 0） | 0 |
 
@@ -51,8 +51,9 @@
 
 | # | 缺什麼 | 問誰／等什麼 |
 |---|---|---|
-| 38 | 使用者批准 3a（Claude Code deny 規則）與 3b（pre-commit 毀滅性指令掃描）兩個配方 | 使用者（批准後 5 分鐘內落地） |
-| 39/40/42 補完/44/45/46/47/48/49 | fullstack-design 定 API 簽名與 model 結構後，於對應實作切片落地 | 依 pipeline 順序：fullstack-design → task-split → implementation；每切片完成時回寫本表狀態 |
+| 39/40/42 補完/44/45/46/47/48/49 | ~~fullstack-design 定 API 簽名~~（2026-07-12 已完成：backend-design 介面 20~34＋核心防線對照表）；餘待 task-split → implementation 對應切片落地 | 每切片完成時回寫本表狀態 |
+
+（#38 已於 2026-07-12 經使用者批准並落地 3a＋3b，移出 BLOCKED。）
 
 ## 交付條件備忘
 
