@@ -19,17 +19,27 @@ set -e
 
 MATRIX="spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/hard-limits-matrix.md"
 DECISION_LOG="spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/decision-log.md"
+MATRIX_V11="spec-syllable-repeater/requirements/syllable-practice-macos-v1.1_20260712/guardrails/hard-limits-matrix.md"
+DECISION_LOG_V11="spec-syllable-repeater/requirements/syllable-practice-macos-v1.1_20260712/guardrails/decision-log.md"
 
 if [ -f "scripts/check_guardrails.py" ]; then
-    echo "[pre-push] 檢查硬性限制 matrix..."
+    echo "[pre-push] 檢查硬性限制 matrix（v1）..."
     python3 scripts/check_guardrails.py "$MATRIX" "$DECISION_LOG" || {
         echo "[pre-push] ❌ 硬性限制檢查未通過，push 被擋下（skill 鐵律 4）。"
         echo "[pre-push]    若確需臨時推遠端，使用 --no-verify（不建議；違反 skill 精神）。"
         exit 1
     }
+    if [ -f "$MATRIX_V11" ]; then
+        echo "[pre-push] 檢查硬性限制 matrix（v1.1 增量）..."
+        python3 scripts/check_guardrails.py "$MATRIX_V11" "$DECISION_LOG_V11" || {
+            echo "[pre-push] ❌ v1.1 matrix 檢查未通過，push 被擋下（skill 鐵律 4）。"
+            exit 1
+        }
+    fi
 elif [ -x "tools/guardrail-checker/target/release/guardrail-checker" ]; then
     echo "[pre-push] 檢查硬性限制 matrix（Rust 版）..."
     tools/guardrail-checker/target/release/guardrail-checker "$MATRIX" "$DECISION_LOG" || exit 1
+    [ -f "$MATRIX_V11" ] && { tools/guardrail-checker/target/release/guardrail-checker "$MATRIX_V11" "$DECISION_LOG_V11" || exit 1; }
 else
     echo "[pre-push] ⚠️ 找不到 guardrail 檢查器，略過 matrix 檢查。"
 fi

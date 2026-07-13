@@ -9,6 +9,8 @@ set -euo pipefail
 
 MATRIX="spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/hard-limits-matrix.md"
 DECISION_LOG="spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/guardrails/decision-log.md"
+MATRIX_V11="spec-syllable-repeater/requirements/syllable-practice-macos-v1.1_20260712/guardrails/hard-limits-matrix.md"
+DECISION_LOG_V11="spec-syllable-repeater/requirements/syllable-practice-macos-v1.1_20260712/guardrails/decision-log.md"
 LICENSE_MANIFEST="spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/release/license-manifest.json"
 
 section() {
@@ -21,6 +23,9 @@ flutter pub get
 
 section "Hard guardrails"
 python3 scripts/check_guardrails.py "$MATRIX" "$DECISION_LOG"
+if [ -f "$MATRIX_V11" ]; then
+  python3 scripts/check_guardrails.py "$MATRIX_V11" "$DECISION_LOG_V11"
+fi
 
 section "Handoff/pipeline-state gate"
 if [ -f scripts/check_handoff.py ]; then
