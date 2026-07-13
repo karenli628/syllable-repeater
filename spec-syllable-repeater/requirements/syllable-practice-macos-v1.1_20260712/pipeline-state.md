@@ -2,12 +2,12 @@
 schema: 1
 project: syllable-repeater
 requirement: syllable-practice-macos-v1.1_20260712
-stage_skill: hard-guardrails
+stage_skill: fullstack-design
 slice: none
 stage_status: done
-next_skill: fullstack-design
+next_skill: task-split
 open_tasks: none
-blocked_reason: matrix #38 毀滅性指令防護配方(3a deny規則/3b pre-commit掃描)待使用者批准;v1 遺留:AT-09-03 smoke、29 檔前序未commit變更
+blocked_reason: 設計待使用者審查(開放問題O1~O4/F1~F2);matrix #38 配方待批;v1 遺留:AT-09-03 smoke、29 檔前序未commit變更
 next_patrol_due: none
 last_handoff: none
 last_updated: 2026-07-12
