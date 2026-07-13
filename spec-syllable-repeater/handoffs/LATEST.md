@@ -1,7 +1,7 @@
 schema: 1
-latest_handoff: spec-syllable-repeater/handoffs/交接檔-20260707-04-fullstack-code-implementation_2.1_SidecarArtifactFetchGate.md
-type: done
-state_file: spec-syllable-repeater/requirements/syllable-practice-macos-v1_20260704/pipeline-state.md
+latest_handoff: spec-syllable-repeater/handoffs/交接檔-20260712-01-fullstack-design_v1.1設計定稿_接task-split_中斷USER.md
+type: interrupted-USER
+state_file: spec-syllable-repeater/requirements/syllable-practice-macos-v1.1_20260712/pipeline-state.md
 
 <!-- 規則(本註解隨檔保留):
 - 落點:spec-<專案代號>/handoffs/LATEST.md;只由 handoff skill 更新,與新交接檔同一個 commit。

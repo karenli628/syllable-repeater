@@ -7,9 +7,9 @@ slice: none
 stage_status: done
 next_skill: task-split
 open_tasks: none
-blocked_reason: 設計待使用者審查(開放問題O1~O4/F1~F2);matrix #38 配方待批;v1 遺留:AT-09-03 smoke、29 檔前序未commit變更
+blocked_reason: v1 遺留:AT-09-03 smoke 待使用者親跑、工作樹 29 檔前序變更待裁定
 next_patrol_due: none
-last_handoff: none
+last_handoff: 交接檔-20260712-01-fullstack-design_v1.1設計定稿_接task-split_中斷USER.md
 last_updated: 2026-07-12
 updated_by: claude-code
 
