@@ -40,3 +40,12 @@ __pycache__/
 # Flutter crash 報告與本機除錯輸出
 flutter_*.log
 diagnostics/
+
+# 專案根目錄音檔（測試素材／版權風險素材必須顯式歸位到有授權標示的目錄）
+# 若專案需要正式的 fixture 音檔，放到 test/fixtures/ 並附授權標示
+/*.mp3
+/*.wav
+/*.m4a
+/*.flac
+/*.aac
+/*.ogg

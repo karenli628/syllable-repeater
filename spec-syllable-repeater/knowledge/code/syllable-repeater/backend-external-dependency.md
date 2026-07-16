@@ -91,8 +91,8 @@ graph LR
 |---|---|---|
 | FFmpeg/ffprobe | 只允許 LGPL dynamic shared；禁止 GPL/nonfree/static LGPL | `scripts/check_licenses.py`、`prepare_release_sidecars.py`、`fetch_sidecar_artifacts.py` |
 | whisper.cpp | MIT | release sidecar manifest 必須含 binary/model |
-| demucs.cpp | MIT | CLI contract 為 `demucs.cpp.main <model-file> <input-audio> <out-dir>` |
-| htdemucs model | 依 manifest 記錄 | SHA-256 pinning |
+| demucs.cpp（程式碼） | MIT | CLI contract 為 `demucs.cpp.main <model-file> <input-audio> <out-dir>` |
+| htdemucs 模型權重 | **⚠️ 授權待獨立確認**（Facebook demucs 原始碼 MIT 不自動套用）；至確認前 Release zip 暫停對外散布 | SHA-256 pinning；詳見 `THIRD_PARTY_NOTICES.md` |
 | CMUdict | BSD-like | release manifest 必須含 data |
 
 ### 5.0 v1.1 依賴用途擴充（2026-07-16）

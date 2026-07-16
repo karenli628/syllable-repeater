@@ -205,7 +205,9 @@ v1.1 在 v1「單句音檔→音節疊加練習」基礎上補齊完整製課流
 
 | 編號 | 問題 | 影響 | 狀態 |
 |------|------|------|------|
-| C-101 | v1.1 未重打 unsigned zip；`dist/` 內仍是 v1 產物 | 對外散布 v1.1 需重跑 `make_release_zip.py` | `[需人工確認]` 是否需要 |
+| C-101 | v1.1 unsigned zip 已重打（`dist/`，529MB，SHA `e8e60b06…83a91c`），但**因 C-105 htdemucs 授權待確認，暫停對外散布** | 若最終確認 htdemucs 為 non-commercial，此 zip 需下架重打（改為執行期下載模型） | ✅ 打包完成／⚠️ 散布暫停 |
+| C-105 | htdemucs 預訓練模型權重授權未獨立確認（Facebook demucs 原始碼 MIT 不自動套用到模型權重） | 若為 non-commercial 或限制型授權，需將模型從 bundled sidecar 改為執行期下載，並更新 `THIRD_PARTY_NOTICES.md` | ⚠️ 待使用者自檢 Facebook demucs LICENSE 與 HF model card；已建立 `THIRD_PARTY_NOTICES.md` 明示狀態 |
+| C-106 | 頂層 `step up your coding skills to a new level.mp3`（YouTube 擷取的 5 秒音檔）於初始 commit（`3c00b15`, 2026-07-06）進版控，已在 public 遠端 | 著作權侵權風險 | ⚠️ 待 rewrite git history 徹底清除＋force push（需明示授權後執行） |
 | C-102 | `analysisRunnerProvider` 預設值為 `PreviewAnalysisRunner`（硬編假音節），正式入口靠 `main.dart` 覆蓋 | 未來新增入口忘記覆蓋會靜默顯示假結果（違 M15 精神） | 獨立複核 suggestion；建議預設改拋錯。`[可升級為通用經驗]`：「DI 預設值不得是靜默假實作，應拋錯讓漏接在啟動即爆」與技術棧無關 |
 | C-103 | 本機殘留舊版未管理 temp 218MB＋舊練習 WAV cache 80MB（S9-22 診斷） | 佔磁碟；新 ManagedTempSession 架構已阻止後續累積 | 待使用者關閉所有 App 後批准一次性清理 |
 | C-104 | 環境單次 30 秒上限使 `ci_core_checks.sh` 無法單條跑完，僅同源拆批 | GitHub Actions 遠端 CI 不受此限 | 記錄事實，無待辦 |
