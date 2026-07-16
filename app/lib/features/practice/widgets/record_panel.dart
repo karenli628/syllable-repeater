@@ -49,9 +49,45 @@ class RecordPanel extends ConsumerWidget {
           ),
           const SizedBox(height: AppTokens.spaceSm),
           _RecordLevel(state: state),
+          if (state.recordedPcm != null) ...[
+            const SizedBox(height: AppTokens.spaceMd),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  key: const ValueKey('recording-playback-toggle'),
+                  onPressed:
+                      state.recordedPlaybackStatus ==
+                          PracticeRecordedPlaybackStatus.playing
+                      ? () => unawaited(controller.stopRecordingPlayback())
+                      : () => unawaited(controller.playRecording()),
+                  icon: Icon(
+                    state.recordedPlaybackStatus ==
+                            PracticeRecordedPlaybackStatus.playing
+                        ? Icons.stop
+                        : Icons.play_arrow,
+                  ),
+                  label: Text(
+                    state.recordedPlaybackStatus ==
+                            PracticeRecordedPlaybackStatus.playing
+                        ? '停止播放'
+                        : '播放錄音',
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: '刪除本次錄音比對',
+                  onPressed: () => unawaited(controller.clearRecordingResult()),
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ),
+          ],
           if (state.comparison != null) ...[
             const SizedBox(height: AppTokens.spaceMd),
-            _ComparisonSummary(result: state.comparison!),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _ComparisonSummary(result: state.comparison!),
+            ),
             const SizedBox(height: AppTokens.spaceMd),
             OverlayChart(data: state.comparison!.overlayData),
           ],
@@ -77,10 +113,16 @@ class _RecordActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (state.recordStatus) {
-      PracticeRecordStatus.idle => FilledButton.icon(
-        onPressed: state.canRecord ? onStart : null,
-        icon: const Icon(Icons.mic),
-        label: const Text('錄音'),
+      PracticeRecordStatus.idle => Wrap(
+        spacing: AppTokens.spaceSm,
+        runSpacing: AppTokens.spaceSm,
+        children: [
+          FilledButton.icon(
+            onPressed: state.canRecord ? onStart : null,
+            icon: const Icon(Icons.mic),
+            label: const Text('錄音'),
+          ),
+        ],
       ),
       PracticeRecordStatus.recording => Row(
         mainAxisSize: MainAxisSize.min,

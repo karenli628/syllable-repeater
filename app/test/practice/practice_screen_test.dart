@@ -9,17 +9,28 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart' hide ComparisonResult;
 import 'package:syllable_repeater_app/features/editor/editor_controller.dart';
 import 'package:syllable_repeater_app/features/import_analysis/analysis_controller.dart';
+import 'package:syllable_repeater_app/features/pack_translate/lesson_session_controller.dart';
 import 'package:syllable_repeater_app/features/practice/practice_controller.dart';
 import 'package:syllable_repeater_app/features/practice/practice_player.dart';
 import 'package:syllable_repeater_app/features/practice/practice_recording.dart';
+import 'package:syllable_repeater_app/features/progress/progress_service.dart';
 import 'package:syllable_repeater_app/main.dart';
 import 'package:syllable_repeater_app/shared/navigation.dart';
 
 class _FakePlayback implements PracticePlayback {
   int playCount = 0;
+  int playPcmCount = 0;
+  int playRowCount = 0;
   int stopCount = 0;
   int? lastRepeatN;
   PracticeStep? lastStep;
+  PracticeRow? lastRow;
+
+  @override
+  Future<void> playPcm(Pcm pcm, {void Function()? onReady}) async {
+    playPcmCount++;
+    onReady?.call();
+  }
 
   @override
   Future<String> renderStepToFile(
@@ -42,9 +53,38 @@ class _FakePlayback implements PracticePlayback {
   }
 
   @override
+  Future<String> renderRowToFile(PracticeRow row, Pcm originalPcm) async =>
+      '/tmp/fake-row.wav';
+
+  @override
+  Future<void> playRow(
+    PracticeRow row,
+    Pcm originalPcm, {
+    void Function()? onReady,
+  }) async {
+    playRowCount++;
+    lastRow = row;
+    onReady?.call();
+  }
+
+  @override
   Future<void> stop() async {
     stopCount++;
   }
+}
+
+class _FakeAudioSession implements PracticeAudioSessionCoordinator {
+  @override
+  Future<void> finishPlayback() async {}
+
+  @override
+  Future<void> finishRecording() async {}
+
+  @override
+  Future<void> prepareForPlayback() async {}
+
+  @override
+  Future<void> prepareForRecording() async {}
 }
 
 class _FakeAnalysisRunner implements AnalysisRunner {
@@ -93,9 +133,9 @@ class _FakeRecorder implements PracticeRecorder {
   }
 
   @override
-  Future<String?> stop() async {
+  Future<CompletedPracticeRecording?> stop() async {
     stopCount++;
-    return '/tmp/attempt.wav';
+    return CompletedPracticeRecording(path: '/tmp/attempt.wav', pcm: _pcm());
   }
 
   @override
@@ -178,6 +218,30 @@ List<Syllable> _syllables() => [
   ),
 ];
 
+Lesson _customLesson() {
+  final syllables = _syllables();
+  return Lesson(
+    id: 'screen-custom',
+    title: 'Screen custom',
+    audioRelPath: 'audio/original.wav',
+    originalAudioBytes: encodeWav(_pcm()),
+    contentHash: 'hash',
+    words: [
+      Word(text: 'thank you very much', startMs: 0, endMs: 1200, index: 0),
+    ],
+    syllables: syllables,
+    translations: const [],
+    prosody: null,
+    practiceConfig: const PracticeConfig(repeatN: 3),
+    arrangement: PracticeEngine().generateArrangement(
+      syllables,
+      lessonId: 'screen-custom',
+      updatedAt: DateTime.utc(2026, 7, 14),
+    ),
+    updatedAt: DateTime.utc(2026, 7, 14),
+  );
+}
+
 Future<ProviderContainer> _pumpApp(
   WidgetTester tester, {
   required _FakePlayback playback,
@@ -194,6 +258,7 @@ Future<ProviderContainer> _pumpApp(
     SyllableRepeaterApp(
       overrides: <Override>[
         practicePlayerProvider.overrideWithValue(playback),
+        practiceAudioSessionProvider.overrideWithValue(_FakeAudioSession()),
         practiceRecorderProvider.overrideWithValue(recorder ?? _FakeRecorder()),
         practiceComparisonServiceProvider.overrideWithValue(
           comparisonService ?? _FakeComparisonService(),
@@ -215,7 +280,7 @@ Future<ProviderContainer> _pumpApp(
 }
 
 void main() {
-  testWidgets('PracticeScreen 導航、repeatN 與播放呼叫 fake player', (tester) async {
+  testWidgets('AT-16-01 自由排列 0 列時只練整個單句', (tester) async {
     final playback = _FakePlayback();
     final container = await _pumpApp(tester, playback: playback, pcm: _pcm());
 
@@ -225,21 +290,101 @@ void main() {
     await tester.pump();
 
     expect(find.text('句尾疊加練習'), findsOneWidget);
-    expect(find.text('#1 much'), findsOneWidget);
-    await tester.tap(find.byTooltip('重複次數 +1'));
+    expect(find.text('共 1 單元；目前第 1 單元。'), findsOneWidget);
+    expect(find.text('#1 thank you ve ry much'), findsOneWidget);
+    expect(find.textContaining('#2 '), findsNothing);
+    await tester.tap(find.byTooltip('目前單元整列重複次數 +1'));
     await tester.pump();
-    expect(find.text('x4'), findsOneWidget);
-
-    await tester.tap(find.text('#2 ry much'));
-    await tester.pump();
-    expect(playback.stopCount, 1);
-    expect(find.text('第 2 步：ry much'), findsOneWidget);
+    expect(find.text('×4'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.play_arrow));
     await tester.pump();
-    expect(playback.playCount, 1);
-    expect(playback.lastRepeatN, 4);
-    expect(playback.lastStep?.index, 2);
+    expect(playback.playPcmCount, 1);
+    expect(playback.playCount, 0);
+  });
+
+  testWidgets('AT-16-02 多列時單元數與整列重複設定即時連動', (tester) async {
+    final playback = _FakePlayback();
+    final container = await _pumpApp(tester, playback: playback, pcm: _pcm());
+    await container
+        .read(lessonSessionControllerProvider.notifier)
+        .hydrateLesson(_customLesson());
+    await tester.pumpAndSettle();
+    container
+        .read(appShellSelectedIndexProvider.notifier)
+        .select(AppSection.practice.sectionIndex);
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('practice-mode-chip')), findsNothing);
+    expect(find.text('自訂排列'), findsNothing);
+    expect(find.text('每列沿用各積木設定'), findsNothing);
+    expect(find.text('共 5 單元；目前第 1 單元。'), findsOneWidget);
+    expect(find.byTooltip('目前單元整列重複次數 +1'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('practice-remove-arrangement')),
+      findsNothing,
+    );
+
+    await tester.tap(find.text('#2 ry much'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('目前單元整列重複次數 +1'));
+    await tester.pump();
+
+    expect(find.text('×4'), findsOneWidget);
+    expect(
+      container.read(editorControllerProvider).arrangement!.rows[1].repeatN,
+      4,
+    );
+    await tester.tap(find.byIcon(Icons.play_arrow));
+    await tester.pump();
+    expect(playback.playRowCount, 1);
+    expect(playback.lastRow?.index, 2);
+    expect(playback.lastRow?.repeatN, 4);
+  });
+
+  testWidgets('FP16.1 四態 SegmentedButton 可切換，無譯文仍顯示引導', (tester) async {
+    final playback = _FakePlayback();
+    final container = await _pumpApp(tester, playback: playback, pcm: _pcm());
+    container
+        .read(appShellSelectedIndexProvider.notifier)
+        .select(AppSection.practice.sectionIndex);
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('transcript-text')), findsOneWidget);
+    await tester.tap(find.text('僅譯文'));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('translation-guidance')), findsOneWidget);
+    expect(find.byKey(const ValueKey('transcript-text')), findsNothing);
+    await tester.tap(find.text('隱藏'));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('transcript-text')), findsNothing);
+    expect(find.byKey(const ValueKey('translation-guidance')), findsNothing);
+    expect(find.text('#1'), findsOneWidget);
+    expect(find.text('#1 much'), findsNothing);
+    expect(find.text('第 1 單元'), findsOneWidget);
+    expect(find.textContaining('第 1 單元：'), findsNothing);
+  });
+
+  testWidgets('FP16.2 每 Lesson 顯示偏好寫入 progress settings 並可讀回', (tester) async {
+    final playback = _FakePlayback();
+    final container = await _pumpApp(tester, playback: playback, pcm: _pcm());
+    await container
+        .read(lessonSessionControllerProvider.notifier)
+        .hydrateLesson(_customLesson());
+    await tester.pumpAndSettle();
+    container
+        .read(appShellSelectedIndexProvider.notifier)
+        .select(AppSection.practice.sectionIndex);
+    await tester.pump();
+
+    await tester.tap(find.text('僅譯文'));
+    await tester.pumpAndSettle();
+    expect(
+      await container
+          .read(transcriptSettingsServiceProvider)
+          .getTranscriptMode('screen-custom'),
+      TranscriptDisplayMode.translationOnly,
+    );
   });
 
   testWidgets('Editor syllable chip 呼叫 4.7 單音節播放', (tester) async {
@@ -252,14 +397,17 @@ void main() {
     await tester.pump();
 
     await tester.tap(find.text('much'));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(playback.playCount, 1);
     expect(playback.lastRepeatN, 1);
     expect(playback.lastStep?.syllables.single.text, 'much');
+    expect(playback.lastStep?.sourceRanges, [
+      TimeRange(800, 2000),
+    ], reason: '最後一塊試聽要播到原始 PCM 結尾');
   });
 
-  testWidgets('PracticeScreen 錄音時停用播放，停止後顯示差異疊圖摘要', (tester) async {
+  testWidgets('AT-18-09 錄音後可播放並可用垃圾桶清除整筆結果', (tester) async {
     final playback = _FakePlayback();
     final recorder = _FakeRecorder();
     final comparison = _FakeComparisonService();
@@ -284,7 +432,10 @@ void main() {
     await tester.pump();
 
     final playButton = tester.widget<IconButton>(
-      find.widgetWithIcon(IconButton, Icons.play_arrow),
+      find.descendant(
+        of: find.byKey(const ValueKey('practice-player-bar')),
+        matching: find.byType(IconButton),
+      ),
     );
     expect(playButton.onPressed, isNull);
     expect(find.text('停止'), findsOneWidget);
@@ -306,6 +457,19 @@ void main() {
     expect(find.textContaining('節奏差異'), findsOneWidget);
     expect(find.textContaining('語調差異'), findsOneWidget);
     expect(find.text('差異疊圖'), findsOneWidget);
+    final recordingPlayback = find.widgetWithText(OutlinedButton, '播放錄音');
+    expect(recordingPlayback, findsOneWidget);
+    await tester.tap(recordingPlayback);
+    await tester.pumpAndSettle();
+    expect(playback.playPcmCount, 1);
+    expect(find.textContaining('暫存'), findsNothing);
+    final clearButton = find.byTooltip('刪除本次錄音比對');
+    expect(clearButton, findsOneWidget);
+    await tester.tap(clearButton);
+    await tester.pumpAndSettle();
+    expect(find.text('差異疊圖'), findsNothing);
+    expect(find.text('播放錄音'), findsNothing);
+    expect(container.read(practiceControllerProvider).recordedPcm, isNull);
   });
 
   testWidgets('麥克風權限拒絕時顯示設定指引', (tester) async {
@@ -330,8 +494,10 @@ void main() {
     final recordButton = find.widgetWithText(FilledButton, '錄音');
     await tester.ensureVisible(recordButton);
     await tester.tap(recordButton);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('請到系統設定開啟麥克風權限。'), findsOneWidget);
+    expect(find.textContaining('請到系統設定開啟麥克風權限。'), findsOneWidget);
+    expect(find.textContaining('請至系統設定開啟麥克風權限'), findsOneWidget);
   });
 }

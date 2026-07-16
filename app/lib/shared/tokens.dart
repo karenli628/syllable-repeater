@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 abstract final class AppTokens {
   static const Color primary = Color(0xFF3B6EF5);
   static const Color needsReview = Color(0xFFE8A13C);
+  static const Color selectedHighlight = Color(0xFFF5D33B);
   static const Color difference = Color(0xFFD94F4F);
   static const Color success = Color(0xFF2E7D5B);
 

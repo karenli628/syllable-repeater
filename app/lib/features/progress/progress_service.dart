@@ -5,6 +5,7 @@ import 'package:infra/infra.dart'
     show
         AppDatabase,
         AtomicFileIo,
+        DriftSettingsService,
         DriftProgressRepository,
         createInMemoryAppDatabase;
 
@@ -31,6 +32,11 @@ final progressServiceProvider = Provider<ProgressService>((ref) {
       fileIo: AtomicFileIo(tempDirPath: paths.tempDirectory),
     ),
   );
+});
+
+/// 每 Lesson 字稿／譯文顯示偏好（REQ-19／介面 34）。
+final transcriptSettingsServiceProvider = Provider<SettingsService>((ref) {
+  return DriftSettingsService(ref.watch(appDatabaseProvider));
 });
 
 abstract interface class ProgressService {

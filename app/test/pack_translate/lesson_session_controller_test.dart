@@ -9,6 +9,28 @@ import 'package:syllable_repeater_app/features/pack_translate/lesson_session_con
 import 'package:syllable_repeater_app/features/practice/practice_controller.dart';
 
 void main() {
+  test('AT-21-01 audio-only v3 可開啟且不假造 Lesson', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final bundle = CourseBundle(
+      courseName: 'Only source audio',
+      sourceAudioName: 'source.m4a',
+      audioFingerprint: 'a' * 64,
+      audioDurationMs: 1200,
+      originalAudioBytes: Uint8List.fromList([1, 2, 3]),
+    );
+
+    await container
+        .read(lessonSessionControllerProvider.notifier)
+        .hydrateCourseBundle(bundle, sourcePath: '/tmp/audio-only.abopack');
+
+    final state = container.read(lessonSessionControllerProvider);
+    expect(state.courseBundle, same(bundle));
+    expect(state.lesson, isNull);
+    expect(state.pcm, isNull);
+    expect(state.sourcePath, '/tmp/audio-only.abopack');
+  });
+
   test('hydrateLesson 會同步 editor syllables 與 practice PCM/steps', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -38,8 +60,12 @@ void main() {
 
     final practice = container.read(practiceControllerProvider);
     expect(practice.decodedPcm?.samples.take(3), [0, 1, 2]);
-    expect(practice.steps, hasLength(2));
-    expect(practice.steps.first.syllables.single.text, 'there');
+    expect(practice.steps, hasLength(1));
+    expect(practice.steps.single.syllables.map((item) => item.text), [
+      'hello',
+      'there',
+    ]);
+    expect(practice.mode, PracticeMode.wholeSentence);
   });
 
   test('hydrateLesson 解碼失敗不覆蓋既有 session/editor/practice', () async {

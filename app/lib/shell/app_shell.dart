@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/editor/editor_screen.dart';
 import '../features/import_analysis/import_screen.dart';
+import '../features/labeling/labeling_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/practice/practice_screen.dart';
 import '../features/progress/progress_settings_screen.dart';
 import '../shared/navigation.dart';
+import '../shared/responsive_layout.dart';
 import '../shared/tokens.dart';
 
 class AppShell extends ConsumerWidget {
@@ -19,86 +21,77 @@ class AppShell extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: AppTokens.minimumWindowWidth,
-              minHeight: AppTokens.minimumWindowHeight,
+      body: ResponsiveLayout(
+        child: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: selectedIndex,
+              onDestinationSelected: (index) {
+                ref.read(appShellSelectedIndexProvider.notifier).select(index);
+              },
+              labelType: NavigationRailLabelType.all,
+              leading: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppTokens.spaceLg,
+                ),
+                child: Icon(
+                  Icons.graphic_eq,
+                  color: colorScheme.primary,
+                  size: 30,
+                ),
+              ),
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.library_music_outlined),
+                  selectedIcon: Icon(Icons.library_music),
+                  label: Text('課程匯入'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.segment_outlined),
+                  selectedIcon: Icon(Icons.segment),
+                  label: Text('段落標籤'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.upload_file_outlined),
+                  selectedIcon: Icon(Icons.upload_file),
+                  label: Text('單句分析'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.tune_outlined),
+                  selectedIcon: Icon(Icons.tune),
+                  label: Text('段落校正'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.play_circle_outline),
+                  selectedIcon: Icon(Icons.play_circle),
+                  label: Text('錄音練習'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings),
+                  label: Text('課程設定'),
+                ),
+              ],
             ),
-            child: SizedBox(
-              width: AppTokens.minimumWindowSize.width,
-              height: AppTokens.minimumWindowSize.height,
-              child: Row(
-                children: [
-                  NavigationRail(
-                    selectedIndex: selectedIndex,
-                    onDestinationSelected: (index) {
-                      ref
-                          .read(appShellSelectedIndexProvider.notifier)
-                          .select(index);
-                    },
-                    labelType: NavigationRailLabelType.all,
-                    leading: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppTokens.spaceLg,
-                      ),
-                      child: Icon(
-                        Icons.graphic_eq,
-                        color: colorScheme.primary,
-                        size: 30,
-                      ),
-                    ),
-                    destinations: const [
-                      NavigationRailDestination(
-                        icon: Icon(Icons.library_music_outlined),
-                        selectedIcon: Icon(Icons.library_music),
-                        label: Text('課件庫'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.upload_file_outlined),
-                        selectedIcon: Icon(Icons.upload_file),
-                        label: Text('匯入'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.tune_outlined),
-                        selectedIcon: Icon(Icons.tune),
-                        label: Text('校正'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.play_circle_outline),
-                        selectedIcon: Icon(Icons.play_circle),
-                        label: Text('練習'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.settings_outlined),
-                        selectedIcon: Icon(Icons.settings),
-                        label: Text('設定'),
-                      ),
-                    ],
-                  ),
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: colorScheme.outlineVariant,
-                  ),
-                  Expanded(
-                    child: IndexedStack(
-                      index: selectedIndex,
-                      children: const [
-                        LibraryScreen(),
-                        ImportScreen(),
-                        EditorScreen(),
-                        PracticeScreen(),
-                        ProgressSettingsScreen(),
-                      ],
-                    ),
-                  ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: colorScheme.outlineVariant,
+            ),
+            Expanded(
+              child: IndexedStack(
+                index: selectedIndex,
+                children: const [
+                  LibraryScreen(),
+                  LabelingScreen(),
+                  ImportScreen(),
+                  EditorScreen(),
+                  PracticeScreen(),
+                  ProgressSettingsScreen(),
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

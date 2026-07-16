@@ -52,28 +52,50 @@ class StagedProgress extends ConsumerWidget {
     }
 
     final event = state.latestEvent;
-    final label = event == null ? '等待音檔' : _stageLabel(event.stage);
-    final progress = event?.progress ?? 0;
+    final (label, progress, active) = _progressPresentation(event);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(
-              state.isRunning ? Icons.autorenew : Icons.pending_outlined,
-              size: 20,
-            ),
+            Icon(active ? Icons.autorenew : Icons.pending_outlined, size: 20),
             const SizedBox(width: AppTokens.spaceSm),
             Expanded(child: Text(label)),
-            Text('${(progress * 100).round()}%'),
+            if (progress != null) Text('${(progress * 100).round()}%'),
           ],
         ),
         const SizedBox(height: AppTokens.spaceSm),
-        LinearProgressIndicator(value: state.isRunning ? progress : null),
+        LinearProgressIndicator(value: progress),
       ],
     );
   }
+
+  (String, double?, bool) _progressPresentation(AnalysisEvent? event) {
+    if (state.isLoading) {
+      final importProgress = state.importProgress;
+      return (
+        _importStageLabel(importProgress?.stage),
+        importProgress?.ratio,
+        true,
+      );
+    }
+    if (state.status == AnalysisRunStatus.ready && state.isAudioReady) {
+      return ('音檔已就緒', 1, false);
+    }
+    if (event != null) {
+      return (_stageLabel(event.stage), event.progress, state.isRunning);
+    }
+    return ('等待音檔', 0, false);
+  }
+
+  String _importStageLabel(AudioImportStage? stage) => switch (stage) {
+    null => '準備匯入音檔',
+    AudioImportStage.readingBytes => '讀取音檔資料',
+    AudioImportStage.validatingFormat => '驗證音檔格式',
+    AudioImportStage.validatingDuration => '驗證音檔長度',
+    AudioImportStage.ready => '音檔已就緒',
+  };
 
   String _stageLabel(AnalysisStage stage) {
     return switch (stage) {

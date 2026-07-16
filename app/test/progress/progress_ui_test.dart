@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:syllable_repeater_app/features/editor/editor_controller.dart';
+import 'package:syllable_repeater_app/features/labeling/labeling_controller.dart';
 import 'package:syllable_repeater_app/features/library/lesson_pack_service.dart';
 import 'package:syllable_repeater_app/features/library/library_screen.dart';
 import 'package:syllable_repeater_app/features/pack_translate/lesson_session_controller.dart';
@@ -35,6 +36,85 @@ void main() {
 
     expect(find.text('Communication Skills'), findsOneWidget);
     expect(find.text('困難'), findsOneWidget);
+  });
+
+  testWidgets('課件庫首頁左側開啟課件，右側顯示課件文字資訊', (tester) async {
+    final service = _FakeProgressService();
+    final packService = _FakeLessonPackService();
+    final packPicker = _FakeLessonPackFilePicker(
+      openPath: '/tmp/opened.abopack',
+    );
+
+    await _pump(
+      tester,
+      service: service,
+      packService: packService,
+      packPicker: packPicker,
+      child: const LibraryScreen(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('開啟課件'), findsOneWidget);
+    expect(find.text('尚未開啟課件'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '選擇 .abopack'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('課件資訊'), findsOneWidget);
+    expect(find.text('Saved Lesson'), findsOneWidget);
+    expect(find.text('opened.abopack'), findsOneWidget);
+    expect(find.text('已開啟譯文'), findsOneWidget);
+  });
+
+  testWidgets('AT-21-01 開啟 labels-only v3 會進入段落標籤且不假造課件', (tester) async {
+    final bundle = CourseBundle(
+      courseName: 'Labels only',
+      sourceAudioName: 'source.m4a',
+      audioFingerprint: 'e' * 64,
+      audioDurationMs: 4000,
+      originalAudioBytes: Uint8List.fromList([1, 2, 3]),
+      labels: CourseLabels(
+        language: 'en',
+        separateVocals: false,
+        segments: [
+          Segment(
+            id: 'segment-1',
+            startMs: 0,
+            endMs: 4000,
+            text: 'labels only',
+            language: 'en',
+            confidence: 0.9,
+          ),
+        ],
+      ),
+    );
+    final openService = _FakeCourseBundleOpenService(
+      OpenedCourseBundle(
+        bundle: bundle,
+        extractedOriginalAudioPath: '/tmp/source.m4a',
+        originalPcm: Pcm(Int16List(4000), sampleRate: 1000),
+      ),
+    );
+
+    final container = await _pump(
+      tester,
+      service: _FakeProgressService(),
+      packPicker: const _FakeLessonPackFilePicker(
+        openPath: '/tmp/labels-only.abopack',
+      ),
+      courseBundleOpenService: openService,
+      showNavigationProbe: true,
+      child: const LibraryScreen(),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '選擇 .abopack'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('selected=1'), findsOneWidget);
+    expect(container.read(lessonSessionControllerProvider).lesson, isNull);
+    expect(
+      container.read(labelingControllerProvider).session?.segments.single.text,
+      'labels only',
+    );
   });
 
   testWidgets('LibraryScreen 歸檔前顯示確認對話框', (tester) async {
@@ -89,49 +169,48 @@ void main() {
     expect(find.text('Saved Lesson'), findsOneWidget);
     expect(find.text('saved.abopack'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, '練習'));
+    final practiceButton = find.widgetWithText(FilledButton, '練習');
+    await tester.ensureVisible(practiceButton);
+    await tester.tap(practiceButton);
     await tester.pumpAndSettle();
-    expect(find.text('selected=3'), findsOneWidget);
+    expect(find.text('selected=4'), findsOneWidget);
     expect(packService.openedPaths, ['/tmp/saved.abopack']);
 
-    await tester.tap(find.widgetWithText(OutlinedButton, '編輯'));
+    final editButton = find.widgetWithText(OutlinedButton, '編輯');
+    await tester.ensureVisible(editButton);
+    await tester.tap(editButton);
     await tester.pumpAndSettle();
-    expect(find.text('selected=2'), findsOneWidget);
+    expect(find.text('selected=3'), findsOneWidget);
     expect(packService.openedPaths, [
       '/tmp/saved.abopack',
       '/tmp/saved.abopack',
     ]);
   });
 
-  testWidgets('LibraryScreen 儲存課件會帶入手動譯文', (tester) async {
+  testWidgets('ProgressSettingsScreen 移除譯文群組但保留設定與進度檔案操作', (tester) async {
     final service = _FakeProgressService();
-    final packService = _FakeLessonPackService();
-    final packPicker = _FakeLessonPackFilePicker(
-      savePath: '/tmp/saved.abopack',
-    );
 
     await _pump(
       tester,
       service: service,
-      packService: packService,
-      packPicker: packPicker,
-      draftBuilder: (manual) => _sampleLesson(manualTranslation: manual),
-      child: const LibraryScreen(),
+      child: const ProgressSettingsScreen(),
     );
     await tester.pumpAndSettle();
 
-    await _scrollLibraryToPackPanel(tester);
-    await tester.enterText(find.byType(TextField), '手動譯文');
-    final saveButton = find.widgetWithText(OutlinedButton, '儲存課件');
-    await tester.tap(saveButton);
-    await tester.pumpAndSettle();
-
-    expect(packService.savedPaths, ['/tmp/saved.abopack']);
-    expect(packService.savedLessons.single.translations.single.text, '手動譯文');
-    expect(find.textContaining('已儲存：/tmp/saved.abopack'), findsOneWidget);
+    final translationField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.labelText?.contains('手動譯文') == true,
+    );
+    expect(translationField, findsNothing);
+    expect(find.text('儲存課件'), findsOneWidget);
+    expect(find.text('AI key'), findsOneWidget);
+    expect(find.text('匯出進度'), findsOneWidget);
+    expect(find.text('匯入進度'), findsOneWidget);
+    expect(find.text('儲存'), findsOneWidget);
   });
 
-  testWidgets('LibraryScreen 開啟損毀課件不覆蓋現有譯文', (tester) async {
+  testWidgets('LibraryScreen 開啟損毀課件不覆蓋現有課件', (tester) async {
     final service = _FakeProgressService();
     final packService = _FakeLessonPackService(
       openError: const DomainException(ErrorCodes.packCorrupted, '課件損毀，無法開啟'),
@@ -140,7 +219,7 @@ void main() {
       openPath: '/tmp/broken.abopack',
     );
 
-    await _pump(
+    final container = await _pump(
       tester,
       service: service,
       packService: packService,
@@ -148,15 +227,19 @@ void main() {
       child: const LibraryScreen(),
     );
     await tester.pumpAndSettle();
+    await container
+        .read(lessonSessionControllerProvider.notifier)
+        .hydrateLesson(_sampleLesson(), sourcePath: '/tmp/existing.abopack');
+    await tester.pump();
 
-    await _scrollLibraryToPackPanel(tester);
-    await tester.enterText(find.byType(TextField), '保留中的譯文');
-    final openButton = find.widgetWithText(OutlinedButton, '開啟課件');
+    final openButton = find.widgetWithText(FilledButton, '選擇 .abopack');
     await tester.tap(openButton);
     await tester.pumpAndSettle();
 
-    final textField = tester.widget<TextField>(find.byType(TextField));
-    expect(textField.controller?.text, '保留中的譯文');
+    expect(
+      container.read(lessonSessionControllerProvider).sourcePath,
+      '/tmp/existing.abopack',
+    );
     expect(find.text('課件損毀，無法開啟'), findsOneWidget);
   });
 
@@ -176,8 +259,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollLibraryToPackPanel(tester);
-    await tester.tap(find.widgetWithText(OutlinedButton, '開啟課件'));
+    await tester.tap(find.widgetWithText(FilledButton, '選擇 .abopack'));
     await tester.pumpAndSettle();
 
     expect(
@@ -197,7 +279,7 @@ void main() {
     expect(container.read(practiceControllerProvider).steps, hasLength(1));
   });
 
-  testWidgets('LibraryScreen ⌘O 與 ⌘S 觸發開啟/儲存課件', (tester) async {
+  testWidgets('LibraryScreen ⌘O 觸發開啟課件', (tester) async {
     final service = _FakeProgressService();
     final packService = _FakeLessonPackService();
     final packPicker = _FakeLessonPackFilePicker(
@@ -214,7 +296,6 @@ void main() {
       child: const LibraryScreen(),
     );
     await tester.pumpAndSettle();
-    await _scrollLibraryToPackPanel(tester);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyO);
@@ -222,13 +303,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(packService.openedPaths, ['/tmp/opened.abopack']);
-
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
-    await tester.pumpAndSettle();
-
-    expect(packService.savedPaths, ['/tmp/saved.abopack']);
   });
 
   testWidgets('ProgressSettingsScreen 讀寫 reminderConfig', (tester) async {
@@ -242,7 +316,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('15'), findsOneWidget);
-    await tester.tap(find.byTooltip('每次分鐘 +1'));
+    final minutesIncrement = find.byTooltip('每次分鐘 +1');
+    await tester.ensureVisible(minutesIncrement);
+    await tester.tap(minutesIncrement);
     await tester.pump();
     final saveButton = find.widgetWithText(FilledButton, '儲存');
     await tester.ensureVisible(saveButton);
@@ -271,7 +347,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final aiKeyFieldFinder = find.byType(TextField);
+    final aiKeyFieldFinder = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField && widget.decoration?.labelText == 'AI key',
+    );
+    await tester.ensureVisible(aiKeyFieldFinder);
     await tester.enterText(aiKeyFieldFinder, 'sk-local-value');
     await tester.tap(find.widgetWithText(FilledButton, '儲存 AI key'));
     await tester.pumpAndSettle();
@@ -371,19 +451,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Saved Lesson'), findsOneWidget);
-    await _scrollLibraryToPackPanel(tester);
-    await tester.tap(find.widgetWithText(OutlinedButton, '開啟課件'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '手動 round-trip');
-    await tester.tap(find.widgetWithText(OutlinedButton, '儲存課件'));
+    await tester.tap(find.widgetWithText(FilledButton, '選擇 .abopack'));
     await tester.pumpAndSettle();
 
     expect(packService.openedPaths, ['/tmp/opened.abopack']);
-    expect(packService.savedPaths, ['/tmp/saved.abopack']);
-    expect(
-      packService.savedLessons.single.translations.single.text,
-      '手動 round-trip',
-    );
     expect(
       libraryContainer.read(lessonSessionControllerProvider).lesson?.id,
       'lesson-a',
@@ -413,21 +484,34 @@ void main() {
       tester,
       service: service,
       picker: progressPicker,
+      packService: packService,
+      packPicker: packPicker,
       aiSettingsService: aiSettings,
       child: const ProgressSettingsScreen(),
     );
     await tester.pumpAndSettle();
+    expect(find.text('手動譯文'), findsNothing);
+    expect(find.text('儲存課件'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'sk-round-trip');
+    final aiKeyField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField && widget.decoration?.labelText == 'AI key',
+    );
+    await tester.ensureVisible(aiKeyField);
+    await tester.enterText(aiKeyField, 'sk-round-trip');
     await tester.tap(find.widgetWithText(FilledButton, '儲存 AI key'));
     await tester.pumpAndSettle();
     expect(aiSettings.configuredCredentials, ['sk-round-trip']);
 
-    await tester.tap(find.text('匯出進度'));
+    final exportProgress = find.text('匯出進度');
+    await tester.ensureVisible(exportProgress);
+    await tester.tap(exportProgress);
     await tester.pumpAndSettle();
     expect(service.exportPaths, ['/tmp/progress.aboprogress']);
 
-    await tester.tap(find.text('匯入進度'));
+    final importProgress = find.text('匯入進度');
+    await tester.ensureVisible(importProgress);
+    await tester.tap(importProgress);
     await tester.pumpAndSettle();
     expect(service.importPaths, ['/tmp/incoming.aboprogress']);
     expect(find.text('匯入摘要'), findsOneWidget);
@@ -541,11 +625,16 @@ Future<ProviderContainer> _pump(
   LessonPackService? packService,
   LessonPackFilePicker? packPicker,
   LessonDraftBuilder? draftBuilder,
+  CourseBundleOpenService? courseBundleOpenService,
   AiSettingsService? aiSettingsService,
   List<LessonLibraryEntry>? lessons,
   bool showNavigationProbe = false,
   required Widget child,
 }) async {
+  tester.view.physicalSize = const Size(1200, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     ProviderScope(
       key: UniqueKey(),
@@ -559,6 +648,14 @@ Future<ProviderContainer> _pump(
           lessonPackFilePickerProvider.overrideWithValue(packPicker),
         if (draftBuilder != null)
           currentLessonDraftBuilderProvider.overrideWithValue(draftBuilder),
+        if (courseBundleOpenService != null)
+          courseBundleOpenServiceProvider.overrideWithValue(
+            courseBundleOpenService,
+          ),
+        if (courseBundleOpenService == null && packService != null)
+          courseBundleOpenServiceProvider.overrideWithValue(
+            _LessonPackBundleAdapter(packService),
+          ),
         if (aiSettingsService != null)
           aiSettingsServiceProvider.overrideWithValue(aiSettingsService),
         if (lessons != null)
@@ -583,11 +680,6 @@ Future<ProviderContainer> _pump(
     ),
   );
   return ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
-}
-
-Future<void> _scrollLibraryToPackPanel(WidgetTester tester) async {
-  await tester.drag(find.byType(ListView).first, const Offset(0, -320));
-  await tester.pumpAndSettle();
 }
 
 class _FakeProgressService implements ProgressService {
@@ -724,6 +816,38 @@ class _FakeLessonPackService implements LessonPackService {
     savedLessons.add(lesson);
     savedPaths.add(path);
     return path;
+  }
+}
+
+class _FakeCourseBundleOpenService implements CourseBundleOpenService {
+  const _FakeCourseBundleOpenService(this.result);
+
+  final OpenedCourseBundle result;
+
+  @override
+  Future<OpenedCourseBundle> open(String path) async => result;
+}
+
+class _LessonPackBundleAdapter implements CourseBundleOpenService {
+  const _LessonPackBundleAdapter(this.service);
+
+  final LessonPackService service;
+
+  @override
+  Future<OpenedCourseBundle> open(String path) async {
+    final lesson = await service.open(path);
+    return OpenedCourseBundle(
+      bundle: CourseBundle(
+        courseName: lesson.title,
+        sourceAudioName: '${lesson.id}.wav',
+        audioFingerprint: lesson.withContentHash().contentHash,
+        audioDurationMs: 400,
+        originalAudioBytes: lesson.originalAudioBytes,
+        sentenceLesson: lesson,
+      ),
+      extractedOriginalAudioPath: '/tmp/${lesson.id}.wav',
+      originalPcm: decodeWav(lesson.originalAudioBytes),
+    );
   }
 }
 

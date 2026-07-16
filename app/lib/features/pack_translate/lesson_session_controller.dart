@@ -9,14 +9,18 @@ final lessonSessionControllerProvider =
 
 class LessonSessionState {
   const LessonSessionState({
+    this.courseBundle,
     this.lesson,
     this.pcm,
+    this.courseOriginalPcm,
     this.waveformPeaks = const [],
     this.sourcePath,
   });
 
+  final CourseBundle? courseBundle;
   final Lesson? lesson;
   final Pcm? pcm;
+  final Pcm? courseOriginalPcm;
   final List<WaveformPeak> waveformPeaks;
   final String? sourcePath;
 
@@ -29,17 +33,50 @@ class LessonSessionController extends Notifier<LessonSessionState> {
   @override
   LessonSessionState build() => const LessonSessionState();
 
+  /// 還原 `.abopack v3`；只有原始音訊時保留封包內容但不假造 Lesson（REQ-21）。
+  Future<void> hydrateCourseBundle(
+    CourseBundle bundle, {
+    String? sourcePath,
+    Pcm? originalPcm,
+  }) async {
+    final lesson = bundle.sentenceLesson;
+    if (lesson == null) {
+      state = LessonSessionState(
+        courseBundle: bundle,
+        courseOriginalPcm: originalPcm,
+        sourcePath: sourcePath,
+      );
+      return;
+    }
+    final decoded = _decodeLesson(lesson);
+    state = LessonSessionState(
+      courseBundle: bundle,
+      lesson: lesson,
+      pcm: decoded.pcm,
+      courseOriginalPcm: originalPcm,
+      waveformPeaks: decoded.peaks,
+      sourcePath: sourcePath,
+    );
+  }
+
   Future<void> hydrateLesson(Lesson lesson, {String? sourcePath}) async {
+    final decoded = _decodeLesson(lesson);
+    state = LessonSessionState(
+      lesson: lesson,
+      pcm: decoded.pcm,
+      waveformPeaks: decoded.peaks,
+      sourcePath: sourcePath,
+    );
+  }
+
+  ({Pcm pcm, List<WaveformPeak> peaks}) _decodeLesson(Lesson lesson) {
     final pcm = decodeWav(
       lesson.originalAudioBytes,
       failureMessage: '課件 WAV 解碼失敗',
     );
-    final peaks = computeWaveformPeaks(pcm, bucketCount: waveformBucketCount);
-    state = LessonSessionState(
-      lesson: lesson,
+    return (
       pcm: pcm,
-      waveformPeaks: peaks,
-      sourcePath: sourcePath,
+      peaks: computeWaveformPeaks(pcm, bucketCount: waveformBucketCount),
     );
   }
 

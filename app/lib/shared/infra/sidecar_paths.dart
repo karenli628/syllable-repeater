@@ -10,6 +10,8 @@ import 'dart:io';
 ///   pipeline 自動走「無分離降級」（M4／backend-design §5 第 704 行），
 ///   使用者若勾了 separateVocals UI 端會顯示「未就緒，將降級使用原音」提示。
 class SidecarPaths {
+  static String? _managedTempDirectory;
+
   final String ffmpegPath;
   final String ffprobePath;
   final String whisperCliPath;
@@ -30,6 +32,19 @@ class SidecarPaths {
     required this.tempDirectory,
   });
 
+  /// 啟動後把所有 adapter 導向本次受管理 session（guardrails #62）。
+  static void useManagedTempDirectory(String path) {
+    if (path.trim().isEmpty) {
+      throw ArgumentError('managed temp directory 不可空白');
+    }
+    _managedTempDirectory = path;
+  }
+
+  /// 僅供 session 結束與測試隔離使用。
+  static void clearManagedTempDirectory() {
+    _managedTempDirectory = null;
+  }
+
   /// App 預設 sidecar 來源：Release/App Store-like AOT 使用 bundle 內資源；
   /// 開發與 widget test 仍使用 `.local-tools/`。
   factory SidecarPaths.current() {
@@ -43,8 +58,10 @@ class SidecarPaths {
   ///
   /// devRoot 尋找順序（2026-07-07 修 S-001：移除寫死絕對路徑）：
   ///   ① 環境變數 `SYLLABLE_REPEATER_DEV_ROOT`
-  ///   ② 由 `Directory.current` 向上尋找含 `pubspec.yaml` 且宣告
-  ///      `name: syllable_repeater_workspace` 的目錄
+  ///   ② 由 `Directory.current` 或可執行檔所在目錄向上尋找含 `pubspec.yaml`
+  ///      且宣告 `name: syllable_repeater_workspace` 的目錄；Finder 啟動
+  ///      macOS debug app 時，current directory 通常不是 workspace，必須
+  ///      以 executable path 作為第二個搜尋起點。
   ///   ③ 皆無 → `StateError` 提示需設環境變數（不再靜默 fallback）
   ///
   /// 他機 clone 若未設環境變數，會直接拋錯而非落到不存在的路徑。
@@ -52,6 +69,7 @@ class SidecarPaths {
     final env = Platform.environment;
     final devRoot = env['SYLLABLE_REPEATER_DEV_ROOT'] ?? _findWorkspaceRoot();
     final tempDir =
+        _managedTempDirectory ??
         env['SYLLABLE_REPEATER_TEMP_DIR'] ??
         '${Directory.systemTemp.path}/syllable_repeater';
     return SidecarPaths(
@@ -90,6 +108,7 @@ class SidecarPaths {
     final sidecarRoot =
         env['SYLLABLE_REPEATER_SIDECAR_DIR'] ?? _join(root, 'sidecar');
     final tempDir =
+        _managedTempDirectory ??
         env['SYLLABLE_REPEATER_TEMP_DIR'] ??
         '${Directory.systemTemp.path}/syllable_repeater';
     return SidecarPaths(
@@ -107,26 +126,32 @@ class SidecarPaths {
     );
   }
 
-  /// 由 [Directory.current] 向上尋找 workspace 根目錄；找不到即拋錯。
+  /// 由執行環境可取得的兩個起點向上尋找 workspace 根目錄；找不到即拋錯。
   /// 判定條件：目錄下有 `pubspec.yaml` 且內含 `name: syllable_repeater_workspace`。
   static String _findWorkspaceRoot() {
-    var dir = Directory.current;
-    for (var i = 0; i < 8; i++) {
-      final pubspec = File('${dir.path}/pubspec.yaml');
-      if (pubspec.existsSync()) {
-        final content = pubspec.readAsStringSync();
-        if (content.contains('name: syllable_repeater_workspace')) {
-          return dir.path;
+    final starts = <Directory>[
+      Directory.current,
+      File(Platform.resolvedExecutable).parent,
+    ];
+    for (final start in starts) {
+      var dir = start;
+      for (var i = 0; i < 16; i++) {
+        final pubspec = File('${dir.path}/pubspec.yaml');
+        if (pubspec.existsSync()) {
+          final content = pubspec.readAsStringSync();
+          if (content.contains('name: syllable_repeater_workspace')) {
+            return dir.path;
+          }
         }
+        final parent = dir.parent;
+        if (parent.path == dir.path) break;
+        dir = parent;
       }
-      final parent = dir.parent;
-      if (parent.path == dir.path) break;
-      dir = parent;
     }
     throw StateError(
       '找不到 syllable_repeater_workspace 根目錄。請設定環境變數 '
       'SYLLABLE_REPEATER_DEV_ROOT=<repo 絕對路徑>；'
-      '或在 workspace 根目錄下執行。',
+      '或從 workspace／其 build app 路徑啟動。',
     );
   }
 
@@ -183,7 +208,8 @@ class SidecarPaths {
         label: 'FFmpeg（解碼）',
         path: ffmpegPath,
         required: true,
-        hint: 'dev：brew install ffmpeg（GPL build 僅限開發）；'
+        hint:
+            'dev：brew install ffmpeg（GPL build 僅限開發）；'
             'release：必須 LGPL shared build（走 scripts/prepare_release_sidecars.py）。',
       ),
       check(
@@ -198,7 +224,8 @@ class SidecarPaths {
         label: 'whisper.cpp（辨識引擎）',
         path: whisperCliPath,
         required: true,
-        hint: 'clone github.com/ggerganov/whisper.cpp 並 cmake build；'
+        hint:
+            'clone github.com/ggerganov/whisper.cpp 並 cmake build；'
             '請放到 .local-tools/whisper.cpp/build/bin/。',
       ),
       check(
@@ -206,7 +233,8 @@ class SidecarPaths {
         label: 'whisper small.en 模型',
         path: whisperModelPath,
         required: true,
-        hint: 'bash whisper.cpp/models/download-ggml-model.sh small.en；'
+        hint:
+            'bash whisper.cpp/models/download-ggml-model.sh small.en；'
             '約 466 MB，MIT 授權。',
       ),
       check(
@@ -221,7 +249,8 @@ class SidecarPaths {
         label: 'demucs.cpp（人聲分離，選用）',
         path: demucsCliPath,
         required: false,
-        hint: 'clone github.com/sevagh/demucs.cpp 並 cmake build；'
+        hint:
+            'clone github.com/sevagh/demucs.cpp 並 cmake build；'
             '未就緒時 pipeline 自動跳過分離改用原音（M4 降級）。',
       ),
       check(
@@ -229,7 +258,8 @@ class SidecarPaths {
         label: 'demucs htdemucs 4-source 模型（選用）',
         path: demucsModelPath,
         required: false,
-        hint: '下載 ggml-model-htdemucs-4s-f16.bin 到 '
+        hint:
+            '下載 ggml-model-htdemucs-4s-f16.bin 到 '
             '.local-tools/demucs.cpp/ggml-demucs/。',
       ),
     ];

@@ -10,6 +10,7 @@ import 'package:infra/infra.dart' show AppDatabase;
 import '../../shared/empty_state.dart';
 import '../../shared/navigation.dart';
 import '../../shared/tokens.dart';
+import '../labeling/labeling_controller.dart';
 import '../pack_translate/lesson_session_controller.dart';
 import '../progress/progress_service.dart';
 import 'lesson_pack_service.dart';
@@ -47,56 +48,58 @@ class LibraryScreen extends ConsumerWidget {
     final lessons = ref.watch(libraryLessonEntriesProvider);
     return Padding(
       padding: const EdgeInsets.all(AppTokens.spaceLg),
-      child: ListView(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '課件庫',
-                  style: Theme.of(context).textTheme.headlineSmall,
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '課件庫',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                 ),
-              ),
-              IconButton.outlined(
-                tooltip: '重新整理',
-                onPressed: () {
-                  ref.invalidate(libraryDueListProvider);
-                  ref.invalidate(libraryLessonEntriesProvider);
-                },
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.spaceMd),
-          SizedBox(
-            height: 190,
-            child: due.when(
-              data: (items) => items.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.library_music_outlined,
-                      title: '目前沒有到期練習',
-                      message: '完成課件後，今日可練清單會顯示在這裡。',
-                    )
-                  : ListView.separated(
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppTokens.spaceSm),
-                      itemBuilder: (context, index) =>
-                          _DueTile(item: items[index]),
-                    ),
-              error: (error, _) => EmptyState(
-                icon: Icons.error_outline,
-                title: '讀取失敗',
-                message: '$error',
-              ),
-              loading: () => const Center(child: CircularProgressIndicator()),
+                IconButton.outlined(
+                  tooltip: '重新整理',
+                  onPressed: () {
+                    ref.invalidate(libraryDueListProvider);
+                    ref.invalidate(libraryLessonEntriesProvider);
+                  },
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: AppTokens.spaceMd),
-          _LessonLibrarySection(lessons: lessons),
-          const SizedBox(height: AppTokens.spaceMd),
-          const _PackTranslationPanel(),
-        ],
+            const SizedBox(height: AppTokens.spaceMd),
+            const _LessonHomePanel(),
+            const SizedBox(height: AppTokens.spaceLg),
+            SizedBox(
+              height: 190,
+              child: due.when(
+                data: (items) => items.isEmpty
+                    ? const EmptyState(
+                        icon: Icons.library_music_outlined,
+                        title: '目前沒有到期練習',
+                        message: '完成課件後，今日可練清單會顯示在這裡。',
+                      )
+                    : ListView.separated(
+                        itemCount: items.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: AppTokens.spaceSm),
+                        itemBuilder: (context, index) =>
+                            _DueTile(item: items[index]),
+                      ),
+                error: (error, _) => EmptyState(
+                  icon: Icons.error_outline,
+                  title: '讀取失敗',
+                  message: '$error',
+                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+              ),
+            ),
+            const SizedBox(height: AppTokens.spaceMd),
+            _LessonLibrarySection(lessons: lessons),
+          ],
+        ),
       ),
     );
   }
@@ -302,152 +305,129 @@ class _DueTile extends ConsumerWidget {
   }
 }
 
-class _PackTranslationPanel extends ConsumerStatefulWidget {
-  const _PackTranslationPanel();
+class _LessonHomePanel extends ConsumerStatefulWidget {
+  const _LessonHomePanel();
 
   @override
-  ConsumerState<_PackTranslationPanel> createState() =>
-      _PackTranslationPanelState();
+  ConsumerState<_LessonHomePanel> createState() => _LessonHomePanelState();
 }
 
-class _PackTranslationPanelState extends ConsumerState<_PackTranslationPanel> {
-  final _controller = TextEditingController();
+class _LessonHomePanelState extends ConsumerState<_LessonHomePanel> {
   bool _busy = false;
-  String? _message;
   String? _error;
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final session = ref.watch(lessonSessionControllerProvider);
     final textTheme = Theme.of(context).textTheme;
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyO, meta: true):
-            _openShortcut,
+        const SingleActivator(LogicalKeyboardKey.keyO, meta: true): _openPack,
         const SingleActivator(LogicalKeyboardKey.keyO, control: true):
-            _openShortcut,
-        const SingleActivator(LogicalKeyboardKey.keyS, meta: true):
-            _saveShortcut,
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true):
-            _saveShortcut,
+            _openPack,
       },
       child: Focus(
         autofocus: true,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(AppTokens.radius),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppTokens.spaceMd),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('譯文', style: textTheme.titleMedium),
-                const SizedBox(height: AppTokens.spaceSm),
-                TextField(
-                  controller: _controller,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: '手動譯文',
-                    border: OutlineInputBorder(),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.spaceMd,
+                    vertical: AppTokens.spaceLg,
                   ),
-                ),
-                const SizedBox(height: AppTokens.spaceSm),
-                Wrap(
-                  spacing: AppTokens.spaceSm,
-                  runSpacing: AppTokens.spaceSm,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : () => unawaited(_openPack()),
-                      icon: const Icon(Icons.folder_open_outlined),
-                      label: const Text('開啟課件'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : () => unawaited(_savePack()),
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('儲存課件'),
-                    ),
-                    Tooltip(
-                      message: '尚未設定 AI key',
-                      child: FilledButton.icon(
-                        onPressed: null,
-                        icon: const Icon(Icons.auto_awesome_outlined),
-                        label: const Text('自動翻譯'),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('開啟課件', style: textTheme.titleLarge),
+                      const SizedBox(height: AppTokens.spaceMd),
+                      FilledButton.icon(
+                        onPressed: _busy ? null : () => unawaited(_openPack()),
+                        icon: const Icon(Icons.folder_open_outlined),
+                        label: const Text('選擇 .abopack'),
                       ),
-                    ),
-                  ],
-                ),
-                if (_busy) ...[
-                  const SizedBox(height: AppTokens.spaceSm),
-                  const LinearProgressIndicator(),
-                ],
-                if (_message != null) ...[
-                  const SizedBox(height: AppTokens.spaceSm),
-                  Text(_message!, style: textTheme.bodyMedium),
-                ],
-                if (_error != null) ...[
-                  const SizedBox(height: AppTokens.spaceSm),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                      if (_busy) ...[
+                        const SizedBox(height: AppTokens.spaceMd),
+                        const LinearProgressIndicator(),
+                      ],
+                      if (_error != null) ...[
+                        const SizedBox(height: AppTokens.spaceMd),
+                        Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ],
-            ),
+                ),
+              ),
+              const SizedBox(width: AppTokens.spaceLg),
+              Expanded(
+                flex: 3,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 190),
+                  padding: const EdgeInsets.all(AppTokens.spaceLg),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    borderRadius: BorderRadius.circular(AppTokens.radius),
+                  ),
+                  child: _LessonInfoPane(session: session),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  void _openShortcut() {
-    if (_busy) {
-      return;
-    }
-    unawaited(_openPack());
-  }
-
-  void _saveShortcut() {
-    if (_busy) {
-      return;
-    }
-    unawaited(_savePack());
-  }
-
   Future<void> _openPack() async {
+    if (_busy) {
+      return;
+    }
     final path = await ref.read(lessonPackFilePickerProvider).pickOpenPath();
     if (!mounted || path == null) {
       return;
     }
     setState(() {
       _busy = true;
-      _message = null;
       _error = null;
     });
     try {
-      final lesson = await ref.read(lessonPackServiceProvider).open(path);
+      final opened = await ref.read(courseBundleOpenServiceProvider).open(path);
       await ref
           .read(lessonSessionControllerProvider.notifier)
-          .hydrateLesson(lesson, sourcePath: path);
+          .hydrateCourseBundle(
+            opened.bundle,
+            sourcePath: path,
+            originalPcm: opened.originalPcm,
+          );
+      if (opened.bundle.labels != null) {
+        ref
+            .read(labelingControllerProvider.notifier)
+            .hydrateCourseBundleLabels(
+              opened.bundle,
+              extractedAudioPath: opened.extractedOriginalAudioPath,
+            );
+      }
       if (!mounted) {
         return;
       }
-      final translation = _preferredTranslation(lesson);
-      setState(() {
-        _controller.text = translation ?? '';
-        _message = '已開啟：${lesson.title}';
-      });
-      ref.invalidate(libraryLessonEntriesProvider);
+      if (opened.bundle.sentenceLesson != null) {
+        ref.invalidate(libraryLessonEntriesProvider);
+      } else if (opened.bundle.labels != null) {
+        ref
+            .read(appShellSelectedIndexProvider.notifier)
+            .select(AppSection.labeling.sectionIndex);
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -459,43 +439,98 @@ class _PackTranslationPanelState extends ConsumerState<_PackTranslationPanel> {
       }
     }
   }
+}
 
-  Future<void> _savePack() async {
-    final path = await ref.read(lessonPackFilePickerProvider).pickSavePath();
-    if (!mounted || path == null) {
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _message = null;
-      _error = null;
-    });
-    try {
-      final lesson = ref.read(currentLessonDraftBuilderProvider)(
-        _controller.text,
+class _LessonInfoPane extends StatelessWidget {
+  const _LessonInfoPane({required this.session});
+
+  final LessonSessionState session;
+
+  @override
+  Widget build(BuildContext context) {
+    final lesson = session.lesson;
+    final bundle = session.courseBundle;
+    final textTheme = Theme.of(context).textTheme;
+    if (lesson == null) {
+      if (bundle != null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('課程封包資訊', style: textTheme.titleMedium),
+            const SizedBox(height: AppTokens.spaceMd),
+            _InfoLine(label: '課程', value: bundle.courseName),
+            _InfoLine(label: '原音', value: bundle.sourceAudioName),
+            _InfoLine(
+              label: '標籤',
+              value: bundle.labels == null
+                  ? '未包含'
+                  : '${bundle.labels!.segments.length} 段',
+            ),
+            const _InfoLine(label: '單句', value: '未包含'),
+          ],
+        );
+      }
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.description_outlined,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: AppTokens.spaceSm),
+          Text('尚未開啟課件', style: textTheme.titleMedium),
+        ],
       );
-      final hydratedLesson = lesson.withContentHash();
-      final writtenPath = await ref
-          .read(lessonPackServiceProvider)
-          .save(hydratedLesson, path);
-      await ref
-          .read(lessonSessionControllerProvider.notifier)
-          .hydrateLesson(hydratedLesson, sourcePath: writtenPath);
-      if (!mounted) {
-        return;
-      }
-      setState(() => _message = '已儲存：$writtenPath');
-      ref.invalidate(libraryLessonEntriesProvider);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _error = _describePackError(error));
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
     }
+
+    final translation = _preferredTranslation(lesson);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('課件資訊', style: textTheme.titleMedium),
+        const SizedBox(height: AppTokens.spaceMd),
+        _InfoLine(label: '標題', value: lesson.title),
+        _InfoLine(
+          label: '檔案',
+          value: session.sourcePath == null
+              ? '尚未儲存'
+              : _fileName(session.sourcePath!),
+        ),
+        _InfoLine(label: '音節', value: '${lesson.syllables.length}'),
+        _InfoLine(
+          label: '譯文',
+          value: translation?.trim().isNotEmpty == true ? translation! : '尚無譯文',
+        ),
+        _InfoLine(label: '更新', value: _dateLabel(lesson.updatedAt.toLocal())),
+      ],
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  const _InfoLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTokens.spaceXs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 52,
+            child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+          ),
+          Expanded(
+            child: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+    );
   }
 }
 

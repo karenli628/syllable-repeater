@@ -1,8 +1,10 @@
 // AI-Generate
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:syllable_repeater_app/features/import_analysis/analysis_controller.dart';
 import 'package:syllable_repeater_app/main.dart';
+import 'package:syllable_repeater_app/shared/navigation.dart';
 
 Future<void> _pumpApp(WidgetTester tester,
     {required bool demucsReady}) async {
@@ -14,12 +16,20 @@ Future<void> _pumpApp(WidgetTester tester,
   await tester.pumpWidget(SyllableRepeaterApp(overrides: [
     demucsReadyProvider.overrideWithValue(demucsReady),
   ]));
+
+  final descendantElement = tester.element(find.byType(MaterialApp));
+  ProviderScope.containerOf(descendantElement)
+      .read(appShellSelectedIndexProvider.notifier)
+      .select(AppSection.importAnalysis.sectionIndex);
+  await tester.pump();
 }
 
 void main() {
   testWidgets('demucs 就緒 → 勾 separateVocals 不顯示未就緒 icon', (tester) async {
     await _pumpApp(tester, demucsReady: true);
-    await tester.tap(find.byType(Checkbox));
+    final checkbox = find.byType(Checkbox);
+    await tester.ensureVisible(checkbox);
+    await tester.tap(checkbox);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byIcon(Icons.info_outline), findsNothing);
@@ -36,7 +46,9 @@ void main() {
   testWidgets('demucs 未就緒 → 勾 separateVocals 顯示未就緒 tooltip icon',
       (tester) async {
     await _pumpApp(tester, demucsReady: false);
-    await tester.tap(find.byType(Checkbox));
+    final checkbox = find.byType(Checkbox);
+    await tester.ensureVisible(checkbox);
+    await tester.tap(checkbox);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byIcon(Icons.info_outline), findsOneWidget);

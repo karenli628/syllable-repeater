@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/tokens.dart';
+import '../library/lesson_pack_service.dart';
 import 'ai_settings_service.dart';
 import 'progress_service.dart';
 
@@ -83,6 +84,7 @@ class _ProgressSettingsScreenState
   bool _saving = false;
   bool _savingAi = false;
   bool _transferring = false;
+  bool _savingCourse = false;
   String? _aiMessage;
   String? _aiError;
   String? _transferMessage;
@@ -112,6 +114,7 @@ class _ProgressSettingsScreenState
             saving: _saving,
             savingAi: _savingAi,
             transferring: _transferring,
+            savingCourse: _savingCourse,
             aiMessage: _aiMessage,
             aiError: _aiError,
             transferMessage: _transferMessage,
@@ -124,6 +127,7 @@ class _ProgressSettingsScreenState
             onSaveAiCredential: () => unawaited(_saveAiCredential()),
             onExportProgress: () => unawaited(_exportProgress()),
             onImportProgress: () => unawaited(_importProgress()),
+            onSaveCourse: () => unawaited(_saveCourse()),
             onRestoreGroup: (groupId) => unawaited(_restoreGroup(groupId)),
           ),
           error: (error, _) => Text('$error'),
@@ -210,6 +214,27 @@ class _ProgressSettingsScreenState
       if (mounted) {
         setState(() => _transferring = false);
       }
+    }
+  }
+
+  Future<void> _saveCourse() async {
+    final path = await ref.read(lessonPackFilePickerProvider).pickSavePath();
+    if (!mounted || path == null) return;
+    setState(() {
+      _savingCourse = true;
+      _transferMessage = null;
+      _transferError = null;
+    });
+    try {
+      final bundle = await ref.read(currentCourseBundleDraftBuilderProvider)();
+      final written = await ref
+          .read(courseBundleSaveServiceProvider)
+          .save(bundle, path);
+      if (mounted) setState(() => _transferMessage = '已儲存課程：$written');
+    } catch (error) {
+      if (mounted) setState(() => _transferError = _describeError(error));
+    } finally {
+      if (mounted) setState(() => _savingCourse = false);
     }
   }
 
@@ -301,6 +326,7 @@ class _SettingsForm extends StatelessWidget {
     required this.saving,
     required this.savingAi,
     required this.transferring,
+    required this.savingCourse,
     required this.aiMessage,
     required this.aiError,
     required this.transferMessage,
@@ -312,6 +338,7 @@ class _SettingsForm extends StatelessWidget {
     required this.onSaveAiCredential,
     required this.onExportProgress,
     required this.onImportProgress,
+    required this.onSaveCourse,
     required this.onRestoreGroup,
   });
 
@@ -322,6 +349,7 @@ class _SettingsForm extends StatelessWidget {
   final bool saving;
   final bool savingAi;
   final bool transferring;
+  final bool savingCourse;
   final String? aiMessage;
   final String? aiError;
   final String? transferMessage;
@@ -333,6 +361,7 @@ class _SettingsForm extends StatelessWidget {
   final VoidCallback onSaveAiCredential;
   final VoidCallback onExportProgress;
   final VoidCallback onImportProgress;
+  final VoidCallback onSaveCourse;
   final ValueChanged<String> onRestoreGroup;
 
   @override
@@ -351,13 +380,15 @@ class _SettingsForm extends StatelessWidget {
             onSave: onSaveAiCredential,
           ),
           const SizedBox(height: AppTokens.spaceLg),
-          _ProgressTransferSection(
+          _FileManagementSection(
             transferring: transferring,
+            savingCourse: savingCourse,
             message: transferMessage,
             summary: transferSummary,
             error: transferError,
             onExport: onExportProgress,
             onImport: onImportProgress,
+            onSaveCourse: onSaveCourse,
           ),
           const SizedBox(height: AppTokens.spaceLg),
           _ArchivedGroupsSection(
@@ -486,22 +517,26 @@ class _AiCredentialSection extends StatelessWidget {
   }
 }
 
-class _ProgressTransferSection extends StatelessWidget {
-  const _ProgressTransferSection({
+class _FileManagementSection extends StatelessWidget {
+  const _FileManagementSection({
     required this.transferring,
+    required this.savingCourse,
     required this.message,
     required this.summary,
     required this.error,
     required this.onExport,
     required this.onImport,
+    required this.onSaveCourse,
   });
 
   final bool transferring;
+  final bool savingCourse;
   final String? message;
   final MergeSummary? summary;
   final String? error;
   final VoidCallback onExport;
   final VoidCallback onImport;
+  final VoidCallback onSaveCourse;
 
   @override
   Widget build(BuildContext context) {
@@ -509,12 +544,22 @@ class _ProgressTransferSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('進度備份', style: textTheme.titleMedium),
+        Text('檔案管理', style: textTheme.titleMedium),
         const SizedBox(height: AppTokens.spaceMd),
         Wrap(
           spacing: AppTokens.spaceSm,
           runSpacing: AppTokens.spaceSm,
           children: [
+            FilledButton.icon(
+              onPressed: transferring || savingCourse ? null : onSaveCourse,
+              icon: savingCourse
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.inventory_2_outlined),
+              label: const Text('儲存課件'),
+            ),
             OutlinedButton.icon(
               onPressed: transferring ? null : onExport,
               icon: const Icon(Icons.file_upload_outlined),

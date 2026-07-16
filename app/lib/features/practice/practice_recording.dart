@@ -11,7 +11,14 @@ import '../../shared/infra/sidecar_paths.dart';
 
 final practiceRecorderProvider = Provider<PracticeRecorder>((ref) {
   final paths = SidecarPaths.current();
-  final recorder = RecordPracticeRecorder(tempDirectory: paths.tempDirectory);
+  final recorder = RecordPracticeRecorder(
+    tempDirectory: paths.tempDirectory,
+    normalizer: FfmpegDecoder(
+      runner: const SidecarRunner(),
+      ffmpegPath: paths.ffmpegPath,
+    ),
+    fileIo: AtomicFileIo(tempDirPath: paths.tempDirectory),
+  );
   ref.onDispose(recorder.dispose);
   return recorder;
 });
@@ -34,11 +41,18 @@ abstract interface class PracticeRecorder {
 
   Future<String> start();
 
-  Future<String?> stop();
+  Future<CompletedPracticeRecording?> stop();
 
   Future<void> cancel();
 
   Future<void> dispose();
+}
+
+class CompletedPracticeRecording {
+  const CompletedPracticeRecording({required this.path, required this.pcm});
+
+  final String path;
+  final Pcm pcm;
 }
 
 abstract interface class PracticeComparisonService {
@@ -68,13 +82,19 @@ class DomainPracticeComparisonService implements PracticeComparisonService {
 
 class RecordPracticeRecorder implements PracticeRecorder {
   final String tempDirectory;
+  final AnalysisAudioDecoder normalizer;
+  final FileIo fileIo;
   final AudioRecorder _recorder;
   StreamSubscription<Amplitude>? _amplitudeSub;
   StreamController<double>? _levels;
   String? _recordingPath;
 
-  RecordPracticeRecorder({required this.tempDirectory, AudioRecorder? recorder})
-    : _recorder = recorder ?? AudioRecorder();
+  RecordPracticeRecorder({
+    required this.tempDirectory,
+    required this.normalizer,
+    required this.fileIo,
+    AudioRecorder? recorder,
+  }) : _recorder = recorder ?? AudioRecorder();
 
   @override
   Stream<double> get levels =>
@@ -116,22 +136,44 @@ class RecordPracticeRecorder implements PracticeRecorder {
   }
 
   @override
-  Future<String?> stop() async {
+  Future<CompletedPracticeRecording?> stop() async {
     await _amplitudeSub?.cancel();
     _amplitudeSub = null;
-    final path = await _recorder.stop();
+    final path = await _recorder.stop() ?? _recordingPath;
     _recordingPath = null;
-    return path;
+    if (path == null) {
+      return null;
+    }
+    try {
+      final pcm = await waitForCompletedRecording(
+        path,
+        normalizer: normalizer,
+        fileIo: fileIo,
+      );
+      return CompletedPracticeRecording(path: path, pcm: pcm);
+    } catch (_) {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+      rethrow;
+    }
   }
 
   @override
   Future<void> cancel() async {
     final path = _recordingPath;
-    await stop();
-    if (path != null) {
-      final file = File(path);
-      if (file.existsSync()) {
-        file.deleteSync();
+    _recordingPath = null;
+    await _amplitudeSub?.cancel();
+    _amplitudeSub = null;
+    try {
+      await _recorder.cancel();
+    } finally {
+      if (path != null) {
+        final file = File(path);
+        if (file.existsSync()) {
+          file.deleteSync();
+        }
       }
     }
   }
@@ -142,4 +184,58 @@ class RecordPracticeRecorder implements PracticeRecorder {
     await _levels?.close();
     await _recorder.dispose();
   }
+}
+
+/// 等待 macOS 錄音外掛完成 WAV header/data 收尾（REQ-06／AT-06-06）。
+Future<Pcm> waitForCompletedRecording(
+  String path, {
+  int attempts = 25,
+  Duration retryDelay = const Duration(milliseconds: 40),
+  AnalysisAudioDecoder? normalizer,
+  FileIo? fileIo,
+}) async {
+  if ((normalizer == null) != (fileIo == null)) {
+    throw ArgumentError('normalizer 與 fileIo 必須同時提供');
+  }
+  DomainException? lastError;
+  int? previousByteLength;
+  for (var attempt = 0; attempt < attempts; attempt++) {
+    final file = File(path);
+    if (await file.exists()) {
+      try {
+        final bytes = await file.readAsBytes();
+        try {
+          return decodeWav(bytes, failureMessage: '錄音 WAV 解碼失敗');
+        } on DomainException catch (error) {
+          lastError = error;
+        }
+
+        // macOS record 外掛在部分環境會交付 stereo/float WAV。
+        // 先等檔案長度連續兩次不變，再交給受管 FFmpeg 轉成
+        // PCM16 mono，避免解碼尚未寫完的 WAV header/data。
+        if (normalizer != null &&
+            fileIo != null &&
+            previousByteLength == bytes.length) {
+          try {
+            final normalized = await normalizer.decode(path);
+            await fileIo.writeBytesAtomic(path, encodeWav(normalized));
+            return normalized;
+          } on DomainException catch (error) {
+            lastError = error;
+          }
+        }
+        previousByteLength = bytes.length;
+      } on DomainException catch (error) {
+        lastError = error;
+      }
+    }
+    if (attempt + 1 < attempts) {
+      await Future<void>.delayed(retryDelay);
+    }
+  }
+  final file = File(path);
+  if (await file.exists()) {
+    await file.delete();
+  }
+  throw lastError ?? const DomainException(ErrorCodes.decodeFailed, '錄音檔未完成寫入');
 }

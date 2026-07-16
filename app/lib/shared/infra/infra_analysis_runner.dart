@@ -29,28 +29,37 @@ class InfraAnalysisRunner implements AnalysisRunner {
         ? DemucsCppVocalSeparator(
             runner: runner,
             decoder: decoder,
+            inputPreparer: FfmpegDemucsAudioPreparer(
+              runner: runner,
+              ffmpegPath: paths.ffmpegPath,
+            ),
             demucsCliPath: paths.demucsCliPath,
             modelPath: paths.demucsModelPath,
             outputDirectory: paths.tempDirectory,
           )
         : null;
+    final transcriber = WhisperAnalysisTranscriber(
+      audioPreparer: FfmpegTranscriptionAudioPreparer(
+        runner: runner,
+        ffmpegPath: paths.ffmpegPath,
+        tempDirectory: paths.tempDirectory,
+      ),
+      transcriber: WhisperCppTranscriber(
+        runner: runner,
+        whisperCliPath: paths.whisperCliPath,
+        modelPath: paths.whisperModelPath,
+        noGpu: true,
+      ),
+      outputDirectory: paths.tempDirectory,
+    );
     final pipeline = AnalysisPipeline(
       decoder: decoder,
-      transcriber: WhisperAnalysisTranscriber(
-        audioPreparer: FfmpegTranscriptionAudioPreparer(
-          runner: runner,
-          ffmpegPath: paths.ffmpegPath,
-          tempDirectory: paths.tempDirectory,
+      transcriberRegistry: TranscriberRegistry([transcriber]),
+      syllabifierRegistry: SyllabifierRegistry([
+        EnglishSyllabifier(
+          alignmentEngine: AlignmentEngine(dictionary: dictionary),
         ),
-        transcriber: WhisperCppTranscriber(
-          runner: runner,
-          whisperCliPath: paths.whisperCliPath,
-          modelPath: paths.whisperModelPath,
-          noGpu: true,
-        ),
-        outputDirectory: paths.tempDirectory,
-      ),
-      alignmentEngine: AlignmentEngine(dictionary: dictionary),
+      ]),
       vocalSeparator: vocalSeparator,
     );
     return InfraAnalysisRunner._(pipeline);

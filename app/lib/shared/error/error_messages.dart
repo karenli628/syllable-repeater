@@ -111,6 +111,41 @@ abstract final class ErrorMessages {
       message: '這份封存已超過可恢復期限。',
       icon: Icons.event_busy_outlined,
     ),
+    ErrorCodes.languageUnsupported: ErrorPresentation(
+      title: '語言不支援',
+      message: '這個語言缺少可用的辨識引擎或音節切分器。',
+      icon: Icons.language_outlined,
+    ),
+    ErrorCodes.labelCorrupted: ErrorPresentation(
+      title: '標籤檔損毀',
+      message: '標籤檔損毀，未載入任何內容。',
+      icon: Icons.label_off_outlined,
+    ),
+    ErrorCodes.labelFingerprintMismatch: ErrorPresentation(
+      title: '標籤檔不相符',
+      message: '此標籤檔屬於另一個音檔，請重新選擇。',
+      icon: Icons.link_off_outlined,
+    ),
+    ErrorCodes.segmentTooClose: ErrorPresentation(
+      title: '段落標籤線太近',
+      message: '距離相鄰標籤線太近，至少需要 0.5 秒。',
+      icon: Icons.view_timeline_outlined,
+    ),
+    ErrorCodes.boundaryTooClose: ErrorPresentation(
+      title: '音節切點太近',
+      message: '距離相鄰切點太近，至少需要 50 毫秒。',
+      icon: Icons.compare_arrows_outlined,
+    ),
+    ErrorCodes.syllableMinCount: ErrorPresentation(
+      title: '至少保留一個音節',
+      message: '至少須保留 1 個音節。',
+      icon: Icons.format_list_numbered_outlined,
+    ),
+    ErrorCodes.blockConfigOutOfRange: ErrorPresentation(
+      title: '練習塊設定超出範圍',
+      message: '重複次數須為 1–10；靜音倍數須為 0–5。',
+      icon: Icons.tune_outlined,
+    ),
   };
 
   static ErrorPresentation fromCode(String code) =>

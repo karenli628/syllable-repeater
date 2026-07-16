@@ -5,17 +5,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:syllable_repeater_app/shared/infra/sidecar_paths.dart';
 
 SidecarPaths _pathsWithMissingArtifacts() => SidecarPaths(
-      ffmpegPath: '/nonexistent/ffmpeg',
-      ffprobePath: '/nonexistent/ffprobe',
-      whisperCliPath: '/nonexistent/whisper-cli',
-      whisperModelPath: '/nonexistent/whisper-model',
-      cmudictPath: '/nonexistent/cmudict',
-      demucsCliPath: '/nonexistent/demucs',
-      demucsModelPath: '/nonexistent/demucs-model',
-      tempDirectory: '/tmp/sr-test',
-    );
+  ffmpegPath: '/nonexistent/ffmpeg',
+  ffprobePath: '/nonexistent/ffprobe',
+  whisperCliPath: '/nonexistent/whisper-cli',
+  whisperModelPath: '/nonexistent/whisper-model',
+  cmudictPath: '/nonexistent/cmudict',
+  demucsCliPath: '/nonexistent/demucs',
+  demucsModelPath: '/nonexistent/demucs-model',
+  tempDirectory: '/tmp/sr-test',
+);
 
 void main() {
+  test('guardrails #62 設定 managed session 後所有 current path 共用該目錄', () {
+    addTearDown(SidecarPaths.clearManagedTempDirectory);
+    SidecarPaths.useManagedTempDirectory('/tmp/sr-managed/session-1');
+
+    expect(SidecarPaths.dev().tempDirectory, '/tmp/sr-managed/session-1');
+    expect(
+      SidecarPaths.bundled(resourcesRoot: '/tmp/resources').tempDirectory,
+      '/tmp/sr-managed/session-1',
+    );
+  });
+
   test('bundled paths map to Contents/Resources/sidecar layout', () {
     final separator = Platform.pathSeparator;
     final paths = SidecarPaths.bundled(
@@ -91,8 +102,7 @@ void main() {
     });
 
     test('已存在檔案時 ready=true、blocking=false', () async {
-      final dir =
-          await Directory.systemTemp.createTemp('sidecar-diagnose-');
+      final dir = await Directory.systemTemp.createTemp('sidecar-diagnose-');
       addTearDown(() => dir.deleteSync(recursive: true));
       final f = File('${dir.path}/present')..writeAsStringSync('ok');
       final status = SidecarComponentStatus(

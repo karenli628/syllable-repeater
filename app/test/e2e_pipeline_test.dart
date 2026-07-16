@@ -51,6 +51,10 @@ void main() {
     // 會被 containerOf 拒絕（見 Riverpod 3.x 該方法實作）。
     final descendantElement = tester.element(find.byType(MaterialApp));
     final container = ProviderScope.containerOf(descendantElement);
+    container
+        .read(appShellSelectedIndexProvider.notifier)
+        .select(AppSection.importAnalysis.sectionIndex);
+    await tester.pump();
 
     final controller = container.read(analysisControllerProvider.notifier);
     await controller.selectAudioPath(_goldenMp3);
@@ -101,7 +105,7 @@ void main() {
       container.read(appShellSelectedIndexProvider),
       AppSection.editor.sectionIndex,
     );
-    expect(find.text('音節校正'), findsOneWidget);
+    expect(find.text('段落校正'), findsWidgets);
     // EditorController 自 pipeline done 事件載入 11 音節（listen loadFrom）
     await tester.pump();
     final editorSyllables = container.read(editorControllerProvider).syllables;
