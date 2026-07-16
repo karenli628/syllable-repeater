@@ -36,3 +36,7 @@ __pycache__/
 .env.*
 *.pem
 *.p12
+
+# Flutter crash 報告與本機除錯輸出
+flutter_*.log
+diagnostics/
