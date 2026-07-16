@@ -3,7 +3,7 @@
 
 ## 1 資料模型設計
 
-資料來源：`packages/infra/lib/db/schema/V1__create_all.sql`、`V2__alter_placeholder.sql` 與 `packages/infra/lib/src/db/app_database.dart`。掃描到表 6 張（全量展示）。
+資料來源：`packages/infra/lib/db/schema/V1__create_all.sql`、`V2__alter_placeholder.sql`、`V3__v11_label_registry.sql` 與 `packages/infra/lib/src/db/app_database.dart`（schemaVersion 3）。掃描到表 7 張（全量展示）。
 
 ### 1.1 表結構設計
 
@@ -93,12 +93,26 @@
 - **索引**: 主鍵 `id`；`idx_audit_log_time(occurred_at)`；`idx_audit_log_action(action)`
 - **備註**: 不存 API key、音訊 bytes、錄音路徑或檔案路徑。
 
+#### 表 7: `label_registry`（V3 新增，v1.1）
+
+- **說明**: 段落標籤索引：音檔指紋 → `.abolabel` 最後已知路徑，供同一音檔重開時提醒載入既有標籤（REQ-11）。
+- **欄位**:
+  | 欄位名 | 型別 | 必填 | 預設值 | 說明 |
+  |---|---|---|---|---|
+  | `audio_fingerprint` | TEXT | 是 | - | 音檔 SHA-256，主鍵 |
+  | `label_path` | TEXT | 是 | - | `.abolabel` 最後已知路徑 |
+  | `segment_count` | INTEGER | 是 | - | 區段數（提示用） |
+  | `updated_at` | INTEGER | 是 | - | epoch ms UTC |
+- **索引**: 主鍵 `audio_fingerprint`
+- **備註**: M10 結構防線一致性——固定四欄，明確斷言無 audio bytes／PCM／recording／blob 欄位（`db_schema_test.dart` v1.1 擴充為全表遞迴掃描）。V2→V3 migration 只新增本表，舊資料保留有測試。**RecordingBuffer 表不存在**（v1.1-r7 撤回）。
+
 ### 2.2 表關係
 
 - `lesson_registry` 與 `practice_group`: 一對多，`practice_group.lesson_id` 參照 `lesson_registry.id`。
 - `practice_group` 與 `srs_state`: 一對一，`srs_state.group_id` 參照 `practice_group.id`。
 - `practice_group` 與 `attempt`: 一對多，`attempt.group_id` 參照 `practice_group.id`。
 - `app_settings` 與 `audit_log`: 無物理外鍵；audit log 透過 `target_type` / `target_id` 保存非敏感追溯。
+- `label_registry`: 獨立索引表，無物理外鍵；以音檔 SHA-256 與 `.abolabel` 檔案對應，不參照 lesson（標籤先於課件存在）。
 
 ```mermaid
 erDiagram
@@ -142,6 +156,13 @@ erDiagram
         REAL intonation_delta
         TEXT overlay_json
         INTEGER created_at
+    }
+
+    label_registry {
+        TEXT audio_fingerprint PK
+        TEXT label_path
+        INTEGER segment_count
+        INTEGER updated_at
     }
 ```
 

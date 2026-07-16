@@ -2,10 +2,10 @@
 schema: 1
 project: syllable-repeater
 requirement: syllable-practice-macos-v1.1_20260712
-stage_skill: fullstack-code-review
-slice: S10-review-r3-independent
+stage_skill: project-archive
+slice: v1.1-archive
 stage_status: done
-next_skill: project-archive
+next_skill: ops-monitoring
 open_tasks: none
 blocked_reason: none
 next_patrol_due: none

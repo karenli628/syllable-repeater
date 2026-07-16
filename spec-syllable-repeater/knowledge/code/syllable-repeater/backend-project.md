@@ -3,7 +3,7 @@
 
 ## 1 專案目的
 
-Syllable Repeater 的後端視角是本機領域服務與基礎設施 adapter：在不啟動伺服器的情況下，完成音訊解碼/辨識/音節對齊、跟讀渲染、錄音比對、課件封裝、SRS 進度與可選 AI 翻譯。核心守則是音訊播放/匯出必須逐 sample 來自原始 PCM 切片，Domain 維持純 Dart。
+Syllable Repeater 的後端視角是本機領域服務與基礎設施 adapter：在不啟動伺服器的情況下，完成段落切段標籤（v1.1）、音訊解碼/辨識/音節對齊、切點增減校正（v1.1）、自由排列與單元渲染（v1.1）、跟讀渲染、錄音單次比對、課件封裝（`.abopack` v1/v2/v3）、SRS 進度與可選 AI 翻譯。核心守則是音訊播放/匯出必須逐 sample 來自原始 PCM 切片（分析軌只供辨識）、Domain 維持純 Dart、語言路由 fail-closed、進度誠實呈現、錄音零持久化。
 
 ## 2 專案目錄結構
 
@@ -35,23 +35,25 @@ syllable repeater/
 │   │       ├── domain.dart            # public exports
 │   │       └── src/
 │   │           ├── ai/                # AIService guardrails
-│   │           ├── alignment/         # syllable alignment, zero crossing
-│   │           ├── analysis/          # AnalysisPipeline, prosody, peaks
-│   │           ├── model/             # immutable domain models
-│   │           ├── pack/              # LessonPackEngine
-│   │           ├── ports/             # side-effect contracts
-│   │           ├── practice/          # PracticeEngine/export WAV
-│   │           ├── progress/          # ProgressEngine/SRS/archive
-│   │           └── recording/         # RecordingComparator
+│   │           ├── alignment/         # alignment、切點增減、EnglishSyllabifier、SyllabifierRegistry（v1.1）
+│   │           ├── analysis/          # AnalysisPipeline、TranscriberRegistry（v1.1）、prosody、peaks
+│   │           ├── labeling/          # LabelSession、SegmentEngine（v1.1）
+│   │           ├── model/             # immutable models（含 Segment/Arrangement/Units/CourseBundle/ExportPlan/DraftLessonIdentity，v1.1）
+│   │           ├── pack/              # LessonPackEngine(v2)、LabelPackEngine、CourseBundleEngine(v3)（v1.1）
+│   │           ├── ports/             # side-effect contracts（＋Transcriber/Syllabifier/LabelRegistry/Settings/AudioImportReader，v1.1）
+│   │           ├── practice/          # PracticeEngine（＋arrangement/units 渲染）/export WAV
+│   │           ├── progress/          # ProgressEngine/SRS/archive（＋transcriptDisplayModes）
+│   │           └── recording/         # RecordingComparator（isolate、限點）
 │   └── infra/
 │       └── lib/
 │           ├── infra.dart             # infra exports
-│           ├── db/schema/             # DDL truth snapshots
+│           ├── db/schema/             # DDL truth snapshots（V1-V3）
 │           └── src/
-│               ├── analysis/          # analysis adapters/cache
-│               ├── db/                # Drift database/repository
+│               ├── analysis/          # analysis adapters/cache、DartIoAudioImportReader（v1.1）
+│               ├── db/                # Drift database/repository（＋label_registry/settings adapters，v1.1）
 │               ├── practice/          # recording/export adapters
-│               └── sidecar/           # FFmpeg/whisper/demucs wrappers
+│               ├── sidecar/           # FFmpeg/whisper/demucs wrappers（whisper segment、demucs stereo，v1.1）
+│               └── managed_temp_session.dart  # lease 鎖受管暫存（v1.1）
 └── scripts/                           # release/license/guardrail gates
 ```
 
@@ -167,25 +169,35 @@ flowchart LR
 
 | 模組 | 功能 | 核心實體/資料 | 主要介面 |
 |---|---|---|---|
-| Analysis | 解碼、分離、轉寫、音節對齊 | `ImportRequest`、`AnalysisEvent`、`AlignmentResult` | `AnalysisPipeline.analyze` |
-| Alignment | CMUdict + vowel fallback syllabify | `Word`、`Syllable`、`TimeRange` | `AlignmentEngine.align` |
-| Practice | 疊加步驟與原始 PCM 渲染 | `PracticeStep`、`Pcm` | `PracticeEngine.buildSteps/renderStep/renderMergedExport` |
-| Recording | 錄音比對 | `ComparisonResult`、`ProsodyPoint` | `RecordingComparator.compare` |
-| Pack | `.abopack` encode/decode | `Lesson`、archive entries | `LessonPackEngine.encode/decode` |
-| Progress | SRS、archive、settings | `ProgressSnapshot`、`PracticeGroup`、`SrsState` | `ProgressEngine`、`ProgressRepository` |
+| Labeling（v1.1） | 段落切段、三態標記、`.abolabel` v2 | `Segment`、`LabelSession`、`LabelOpenResult/Warning/Progress` | `SegmentEngine.openAudio`、`LabelPackEngine.writeLabel/readLabel` |
+| Registry（v1.1） | ASR/切分器語言路由（fail-closed） | `TranscriberEngine`/`Syllabifier` ports | `TranscriberRegistry/SyllabifierRegistry.resolve` |
+| Analysis | 解碼、分離、轉寫、音節對齊（雙 Registry 路由；雙軌 PCM） | `ImportRequest`（language/sourceRange）、`AnalysisEvent`、`AnalysisAudioTracks`、`AlignmentResult` | `AnalysisPipeline.analyze` |
+| Alignment | CMUdict + vowel fallback syllabify；切點增減/改字（v1.1） | `Word`、`Syllable`（originalText）、`TimeRange` | `AlignmentEngine.align/removeBoundary/insertBoundary/updateSyllableText` |
+| Arrangement（v1.1） | 積木/組塊/列自由排列與單元判定 | `PracticeBlock/Row/Arrangement`、`PracticeUnits`、`DraftLessonIdentity` | `generateArrangement`、聚合操作、`renderBlockRow`、`effectiveUnits`、`renderSinglePassReference` |
+| Practice | 疊加步驟與原始 PCM 渲染 | `PracticeStep`、`Pcm` | `PracticeEngine.buildSteps/renderStep/renderMergedExport/renderCustomExport` |
+| Recording | 錄音單次比對（isolate、每圖 ≤1000 點） | `ComparisonResult`、`ProsodyPoint` | `RecordingComparator.compare` |
+| Pack | `.abopack` v1/v2/v3、`.abolabel` v2、四層匯出 | `Lesson`（language/arrangement）、`CourseBundle`、`PracticeExportPlan` | `LessonPackEngine`、`CourseBundleEngine.writeV3/read`、`PracticeExportPlanner.build` |
+| Progress | SRS、archive、settings、顯示偏好 | `ProgressSnapshot`（transcriptDisplayModes）、`PracticeGroup`、`SrsState` | `ProgressEngine`、`ProgressRepository`、`SettingsService` |
+| Import Ready（v1.1） | 真實匯入就緒（M15） | `AudioImportProgress` | `AudioImportReader.readAndValidate` |
 | AI | credential + translation | `AiProviderConfig`、`Translation` | `AIService.configure/translate` |
 | Infra Sidecar | child process isolation | `SidecarResult` | `SidecarRunner.run` |
-| Infra DB | Drift persistence | 6 張 SQLite 表 | `DriftProgressRepository` |
-| Release Gate | x86_64 sidecar 發布 | `.app` bundled sidecar + zip | `fetch/prepare/make_release_zip` scripts |
+| Infra DB | Drift persistence | 7 張 SQLite 表（V3 增 label_registry） | `DriftProgressRepository`、`DriftLabelRegistryRepository`、`DriftSettingsService` |
+| Infra Temp（v1.1） | lease 鎖受管暫存與清掃 | temp session dirs | `ManagedTempSession` |
+| Release Gate | x86_64 sidecar 發布；新引擎五步上架 | `.app` bundled sidecar + zip | `fetch/prepare/make_release_zip` scripts＋`check_licenses.py`（source 必填） |
 
 ### 3.3 業務規則
 
-- M1：播放/匯出音訊逐 sample 來自原始 PCM；禁止 TTS/生成/合成。
+- M1：播放/匯出音訊逐 sample 來自原始 PCM；禁止 TTS/生成/合成。v1.1 補述：同 Lesson 同原音的多段切片可任意順序/次數串接；`originalPcm`/`analysisPcm` 分欄，分析軌（Demucs）只供辨識。
 - M2：步數等於音節數，第 n 步為句尾倒數 n 個音節，不做單字邊界吸附。
-- M3：合併匯出靜音等於前一步 totalDurationMs，以 sample 數計。
+- M3（r6 細化）：積木預設 repeat 1/silence 1 倍（尾輪保留）；整列預設 3/1 倍（靜音基準只算擺放積木原始長度一次，尾輪不留）；多單元間隔＝前一已渲染單元 totalDurationMs。
 - M5：Domain 純 Dart，不 import Flutter、infra、dart:io/ffi/html。
-- M6：進度合併依 updatedAt 較新覆寫；contentHash 僅重置該課。
+- M6：進度合併依 updatedAt 較新覆寫；contentHash 僅重置該課（仍只依原音＋音節，排列變更不重置）。
 - M7：跨日零懲罰，schema 無逾期/失敗/懲罰欄位。
 - M8：ARCHIVED 168 小時內可恢復，不含 168 小時；EXPIRED 不可逆。
-- M9：release 僅允許 MIT/BSD/ISC/Apache-2.0/LGPL dynamic，禁止 GPL/AGPL/non-commercial。
-- M10：API key 只進 Keychain，錄音比較後清理，DB/audit 不存音訊或路徑欄位。
+- M9：release 僅允許 MIT/BSD/ISC/Apache-2.0/LGPL dynamic，禁止 GPL/AGPL/non-commercial；新 ASR 引擎/模型上架必經五步（adapter→授權→故障注入→金標準回歸→註冊）。
+- M10（r7 定案）：API key 只進 Keychain；錄音零持久化——無 RecordingBuffer 類型/表/provider，temp 一律 finally 清除，僅目前單元最近一次 PCM 存 UI 記憶體（五時機清除）；DB/pack/progress/audit 不存音訊或路徑欄位。
+- M11（v1.1）：步數基準＝編輯後當時音節總數；金標準 11 僅為未編輯預設。
+- M12（v1.1）：排列覆蓋——0 列＝完整單句 1 單元、N 列＝N 單元；`effectiveUnits` 為唯一判定入口；自動模式演算法不可改。
+- M13（v1.1）：ASR 與 Syllabifier 雙抽層 port；新引擎以 adapter 加入，不改 Domain。
+- M14（v1.1）：每 Lesson/Segment 必帶 language；查無切分器明確拒絕附支援清單，禁默默英文 fallback。
+- M15（v1.1）：進度與就緒必須由真實工作量/階段事件推進；「已就緒」＝位元組＋格式＋時長全驗證；禁假百分比。

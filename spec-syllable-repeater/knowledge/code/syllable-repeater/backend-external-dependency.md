@@ -51,7 +51,8 @@ graph LR
 | OpenAI Responses API | 第三方服務 | HTTPS | `https://api.openai.com/v1/responses` | 可選文字翻譯 |
 | macOS Keychain | 基礎設施 | `flutter_secure_storage` | `SecureStore` key `ai.apiKey` | 儲存 AI credential |
 | LGPL shared FFmpeg/ffprobe | 本機 sidecar | `ProcessRunner` | `SidecarPaths.ffmpegPath/ffprobePath` | 解碼、時長探測、mp3 匯出 |
-| whisper.cpp | 本機 sidecar | `ProcessRunner` | `SidecarPaths.whisperCliPath` | 詞級時間戳辨識 |
+| whisper.cpp | 本機 sidecar | `ProcessRunner` | `SidecarPaths.whisperCliPath` | 詞級時間戳辨識；v1.1 另供 segment 級切段（段落標籤） |
+| macOS audio session | 基礎設施 | `audio_session` plugin（v1.1 直接依賴） | `PracticeAudioSessionCoordinator` | 錄音/播放 category 切換；錄後即播不卡 record 類別 |
 | whisper small.en model | 本機模型 | 檔案讀取 | `SidecarPaths.whisperModelPath` | whisper.cpp 模型 |
 | demucs.cpp | 本機 sidecar | `ProcessRunner` | `SidecarPaths.demucsCliPath` | 可選人聲分離 |
 | htdemucs 4-source model | 本機模型 | 檔案讀取 | `SidecarPaths.demucsModelPath` | demucs.cpp 模型 |
@@ -94,7 +95,14 @@ graph LR
 | htdemucs model | 依 manifest 記錄 | SHA-256 pinning |
 | CMUdict | BSD-like | release manifest 必須含 data |
 
-### 5.1 2026-07-11 release dependency snapshot
+### 5.0 v1.1 依賴用途擴充（2026-07-16）
+
+- whisper.cpp：新增 segment 級時間戳消費（`WhisperJsonParser.parseSegments`），供段落標籤自動切段；binary/model 不變。
+- demucs.cpp：輸入改由原始匯入檔直接準備 44.1kHz stereo（不先 downmix mono）；CLI 契約不變。
+- `audio_session` ^0.2.4：由 transitive 升為 app 直接依賴，錄音停止後先釋放 record session 再啟用 playback。
+- 無新增遠端服務、無新增模型、無授權變更；license manifest 仍為 25 components。
+
+### 5.1 2026-07-11 release dependency snapshot（v1；v1.1 沿用同批 sidecar/model）
 
 | 依賴 | 發布事實 |
 |---|---|
