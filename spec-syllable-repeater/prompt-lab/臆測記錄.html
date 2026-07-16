@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-Hant">
+<!--
+  臆測記錄.html — 本專案 AI 臆測揭露的持久記錄（憲法 C13 第④步）
+  ═══════════════════════════════════════════════════════════════
+  【AI 追加規則——逐字遵守,不得變形】
+  1. 觸發時機:每筆【臆測揭露】在使用者回答後。
+  2. 寫入位置:找到下方「APPEND-HERE」錨點註解,把新的 <article class="entry">…</article>
+     區塊插在錨點「之前」。錨點本身永遠保留在最後一筆之後。
+  3. 區塊格式:整段複製下方「範例 entry」,只改七個欄位的內容,不改結構與 class 名。
+  4. 靜默原則:寫入後不得在對話中回顯本檔內容;收尾列報時只說「本次臆測記錄 N 筆」。
+  5. 禁止:不得修改或刪除既有 entry(append-only);不得改動 <style> 區塊;
+     不得把本註解區塊刪掉。
+  6. 編號規則:id 取「E + 三位流水號」,接續現有最大編號(第一筆=E001)。
+  ═══════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>臆測記錄 — syllable-repeater</title>
+<style>
+  :root{
+    --paper:#EDEEE9; --card:#FFFFFF; --ink:#1F2833; --muted:#67716F;
+    --accent:#3E6E5B; --accent-soft:#DDE7E1;
+    --ochre:#B7783A; --ochre-soft:#F1E4D0;
+    --info:#3C6382; --info-soft:#DBE6EF;
+    --line:#D2D5CE;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#131A1D; --card:#1B2226; --ink:#DDE3DE; --muted:#8FA09C;
+      --accent:#7BBC9E; --accent-soft:#1E322B;
+      --ochre:#D8A66A; --ochre-soft:#302416;
+      --info:#8FB4CD; --info-soft:#1B2A34;
+      --line:#2C3438;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+    font-size:16px; line-height:1.85;}
+  .page{max-width:46rem; margin:0 auto; padding:2rem 1.25rem 5rem;}
+  h1{font-size:1.6rem; line-height:1.35; margin:0 0 .4rem;}
+  .lede{color:var(--muted); font-size:.95rem; margin:0 0 2rem;
+    border-bottom:2px solid var(--ink); padding-bottom:1.2rem;}
+  .entry{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--ochre);
+    border-radius:8px; padding:1rem 1.2rem; margin:1.1rem 0;}
+  .entry header{display:flex; flex-wrap:wrap; gap:.4rem .8rem; align-items:baseline;
+    margin-bottom:.6rem; border-bottom:1px dashed var(--line); padding-bottom:.5rem;}
+  .entry .eid{font-family:ui-monospace,Menlo,monospace; font-weight:700; color:var(--ochre);
+    background:var(--ochre-soft); border-radius:6px; padding:.1rem .5rem; font-size:.8rem;}
+  .entry .date,.entry .stage{font-family:ui-monospace,Menlo,monospace; font-size:.8rem; color:var(--muted);}
+  .entry dl{margin:0; display:grid; grid-template-columns:7.5rem 1fr; gap:.35rem .8rem;}
+  .entry dt{color:var(--muted); font-size:.85rem; font-weight:700;}
+  .entry dd{margin:0; font-size:.95rem;}
+  .entry dd.trigger{background:var(--info-soft); border-radius:6px; padding:.2rem .6rem;
+    font-style:normal;}
+  .entry dd.advice{color:var(--accent); font-weight:600;}
+  @media (max-width:34rem){ .entry dl{grid-template-columns:1fr} .entry dt{margin-top:.4rem} }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>臆測記錄 — syllable-repeater</h1>
+  <p class="lede">每一筆是 AI 在本專案中「後設發現自己正在臆測」的事件（憲法 C13）。
+    「觸發原文」與「因果邏輯」欄告訴你:你的哪個詞、哪句話讓 AI 需要猜——
+    這是你優化未來提示詞的第一手素材。本檔由 AI 靜默維護,append-only,跨需求與 session 持續累積。</p>
+
+  <!-- ═══ 範例 entry(AI 追加時整段複製、改七欄內容;本範例保持註解狀態不顯示)═══
+  <article class="entry" id="E001">
+    <header>
+      <span class="eid">E001</span>
+      <span class="date">2026-07-12</span>
+      <span class="stage">階段:requirement-analysis</span>
+    </header>
+    <dl>
+      <dt>臆測內容</dt><dd>我假設「清單要同步」指的是多裝置即時同步(而非手動匯出匯入)。</dd>
+      <dt>觸發原文</dt><dd class="trigger">「家人也要能看到清單」——「也要能看到」四個字沒有說明即時性與方式。</dd>
+      <dt>因果邏輯</dt><dd>「看到」可以是即時同步、定期更新、或轉傳截圖;句子只給了結果(看到)沒給機制(怎麼看到),機制空白迫使 AI 選一種填入。</dd>
+      <dt>使用者最終回答</dt><dd>手動分享連結就好,不需要即時同步。</dd>
+      <dt>提示詞改善建議</dt><dd class="advice">描述多人功能時,加一句「用什麼方式共享、需不需要即時」可避免此類臆測。</dd>
+    </dl>
+  </article>
+  ═══ 範例結束 ═══ -->
+
+  <article class="entry" id="E001">
+    <header>
+      <span class="eid">E001</span>
+      <span class="date">2026-07-13</span>
+      <span class="stage">階段:fullstack-code-implementation</span>
+    </header>
+    <dl>
+      <dt>臆測內容</dt><dd>我假設跨課件來源檢查應在 placeBlock 入口完成，違反時用 ArgumentError 拒絕，不新增使用者錯誤碼。</dd>
+      <dt>觸發原文</dt><dd class="trigger">「批准調整順序」只批准 5.1→5.2→4.4，未指定跨課件來源檢查的介面與錯誤型別。</dd>
+      <dt>因果邏輯</dt><dd>設計要求 Arrangement 綁單一 lessonId，卻未讓 generateArrangement 或 placeBlock 接收來源課件；若直接實作，必須由 AI 自行選擇檢查入口與錯誤型別。</dd>
+      <dt>使用者最終回答</dt><dd>使用者回覆「批准」，同意 generateArrangement 與 placeBlock 補 lessonId 來源檢查，跨課件以 ArgumentError 拒絕且不新增錯誤碼。</dd>
+      <dt>提示詞改善建議</dt><dd class="advice">批准結構防線時，可一併指定「來源識別由哪個介面傳入、違反時用既有錯誤碼或程式契約錯誤」。</dd>
+    </dl>
+  </article>
+
+  <article class="entry" id="E002">
+    <header>
+      <span class="eid">E002</span>
+      <span class="date">2026-07-14</span>
+      <span class="stage">階段:fullstack-code-review</span>
+    </header>
+    <dl>
+      <dt>臆測內容</dt><dd>我假設自由排列不存在任何一列時，句尾疊加練習應顯示 0 個練習單元。</dd>
+      <dt>觸發原文</dt><dd class="trigger">「自由排列區域已經按刪除自訂排列清空，句尾疊加練習應該要沒有任何單元可以練習」——這句沒有說明「沒有任何單元」是否仍保留整句作為預設單元。</dd>
+      <dt>因果邏輯</dt><dd>「清空自訂排列」可以代表完全沒有練習內容，也可以代表回退到整句練習；原文只排除了自訂列，未明確定義空狀態的替代內容。</dd>
+      <dt>使用者最終回答</dt><dd>自由排列沒有任何一列時保留 1 個練習單元，內容是使用者所選的整個單句；出現一列以上時，練習單元數與列數一對一連動。</dd>
+      <dt>提示詞改善建議</dt><dd class="advice">描述清空後行為時，可明寫「空狀態顯示幾個單元，以及預設內容從哪裡取得」。</dd>
+    </dl>
+  </article>
+
+  <article class="entry" id="E003">
+    <header>
+      <span class="eid">E003</span>
+      <span class="date">2026-07-14</span>
+      <span class="stage">階段:fullstack-code-review</span>
+    </header>
+    <dl>
+      <dt>臆測內容</dt><dd>我假設整列設定包住列內各積木設定，並同時套用於整列預覽、正式練習與匯出。</dd>
+      <dt>觸發原文</dt><dd class="trigger">「增加一選項圖示，裡面可以設定整列的播放次數及靜音倍數」——只指定整列參數，未說明它與積木參數的先後層級，也未列出適用功能。</dd>
+      <dt>因果邏輯</dt><dd>整列設定可能取代積木設定、先套整列再套積木，或在積木結果外再包一層；也可能只影響預覽。缺少運算順序與作用範圍時，AI 必須自行選擇。</dd>
+      <dt>使用者最終回答</dt><dd>整列設定包住列內各積木設定，並同時作用於列預覽、練習與匯出。</dd>
+      <dt>提示詞改善建議</dt><dd class="advice">新增多層播放設定時，可同時寫出「內外層運算順序」與「預覽／練習／匯出哪些路徑必須一致」。</dd>
+    </dl>
+  </article>
+
+  <!-- APPEND-HERE -->
+</div>
+</body>
+</html>
