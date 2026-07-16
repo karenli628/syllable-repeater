@@ -83,35 +83,136 @@ class AlignmentEngine {
       );
     }
 
-    final rawSnapped =
-        findNearestZeroCrossingMs(pcm, targetMs: newPositionMs);
+    final rawSnapped = findNearestZeroCrossingMs(pcm, targetMs: newPositionMs);
     // 開區間 clamp：吸附後仍須嚴守 prev.startMs < snapped < next.endMs
-    final snappedMs = rawSnapped
-        .clamp(prev.startMs + 1, next.endMs - 1);
+    final snappedMs = rawSnapped.clamp(prev.startMs + 1, next.endMs - 1);
 
     final updated = <Syllable>[
       for (var i = 0; i < current.length; i++)
         if (i == boundaryIndex)
-          Syllable(
-            text: current[i].text,
-            startMs: current[i].startMs,
-            endMs: snappedMs,
-            wordIndex: current[i].wordIndex,
-            needsReview: false,
-          )
+          current[i].copyWith(endMs: snappedMs, needsReview: false)
         else if (i == boundaryIndex + 1)
-          Syllable(
-            text: current[i].text,
-            startMs: snappedMs,
-            endMs: current[i].endMs,
-            wordIndex: current[i].wordIndex,
-            needsReview: false,
-          )
+          current[i].copyWith(startMs: snappedMs, needsReview: false)
         else
           current[i],
     ];
 
     return BoundaryUpdateResult(syllables: updated, snappedMs: snappedMs);
+  }
+
+  /// 刪除音節切點並合併相鄰音節（backend-design.md §3.2.1 介面 24；REQ-13）。
+  AlignmentResult removeBoundary(
+    AlignmentResult result,
+    int boundaryIndex,
+  ) {
+    if (result.syllables.length <= 1) {
+      throw DomainException(
+        ErrorCodes.syllableMinCount,
+        '音節至少保留 1 個（got ${result.syllables.length}）',
+      );
+    }
+    if (boundaryIndex < 0 || boundaryIndex >= result.syllables.length - 1) {
+      throw ArgumentError(
+        'boundaryIndex 需介於 0..${result.syllables.length - 2}（got $boundaryIndex）',
+      );
+    }
+
+    final left = result.syllables[boundaryIndex];
+    final right = result.syllables[boundaryIndex + 1];
+    final mergedOriginalText = [
+      left.originalText ?? left.text,
+      right.originalText ?? right.text,
+    ].where((text) => text.isNotEmpty).join(' ');
+    final mergedText =
+        [left.text, right.text].where((text) => text.isNotEmpty).join(' ');
+    final merged = Syllable(
+      text: mergedText,
+      originalText: mergedOriginalText,
+      startMs: left.startMs,
+      endMs: right.endMs,
+      wordIndex: left.wordIndex,
+      needsReview: true,
+    );
+    return result.copyWith(syllables: [
+      ...result.syllables.take(boundaryIndex),
+      merged,
+      ...result.syllables.skip(boundaryIndex + 2),
+    ]);
+  }
+
+  /// 在單一音節內新增切點（backend-design.md §3.2.1 介面 25；REQ-13）。
+  AlignmentResult insertBoundary(
+    AlignmentResult result,
+    int syllableIndex,
+    int atMs, {
+    required Pcm pcm,
+  }) {
+    if (syllableIndex < 0 || syllableIndex >= result.syllables.length) {
+      throw ArgumentError(
+        'syllableIndex 需介於 0..${result.syllables.length - 1}（got $syllableIndex）',
+      );
+    }
+    final target = result.syllables[syllableIndex];
+    if (pcm.durationMs < target.endMs) {
+      throw ArgumentError(
+        'pcm.durationMs 必須涵蓋目標音節末端 ${target.endMs}ms（got ${pcm.durationMs}）',
+      );
+    }
+    if (atMs <= target.startMs || atMs >= target.endMs) {
+      throw DomainException(
+        ErrorCodes.boundaryTooClose,
+        '新增切點必須位於音節內（範圍=${target.startMs}..${target.endMs}ms、got $atMs）',
+      );
+    }
+
+    final snappedMs = findNearestZeroCrossingMs(pcm, targetMs: atMs);
+    final distanceFromStart = snappedMs - target.startMs;
+    final distanceFromEnd = target.endMs - snappedMs;
+    if (distanceFromStart < 50 || distanceFromEnd < 50) {
+      throw DomainException(
+        ErrorCodes.boundaryTooClose,
+        '新增切點距既有切點須至少 50ms（吸附=$snappedMs、左距=$distanceFromStart、右距=$distanceFromEnd）',
+      );
+    }
+
+    final originalText = target.originalText ?? target.text;
+    return result.copyWith(syllables: [
+      ...result.syllables.take(syllableIndex),
+      target.copyWith(originalText: originalText, endMs: snappedMs),
+      Syllable(
+        text: '',
+        originalText: originalText,
+        startMs: snappedMs,
+        endMs: target.endMs,
+        wordIndex: target.wordIndex,
+        needsReview: true,
+      ),
+      ...result.syllables.skip(syllableIndex + 1),
+    ]);
+  }
+
+  /// 修改音節文字並保留第一次辨識原文（backend-design.md §3.2.1 介面 26；REQ-13）。
+  AlignmentResult updateSyllableText(
+    AlignmentResult result,
+    int index,
+    String newText,
+  ) {
+    if (index < 0 || index >= result.syllables.length) {
+      throw ArgumentError(
+        'index 需介於 0..${result.syllables.length - 1}（got $index）',
+      );
+    }
+    final current = result.syllables[index];
+    final updated = current.copyWith(
+      text: newText,
+      originalText: current.originalText ?? current.text,
+      needsReview: newText.trim().isEmpty,
+    );
+    return result.copyWith(syllables: [
+      ...result.syllables.take(index),
+      updated,
+      ...result.syllables.skip(index + 1),
+    ]);
   }
 
   List<Syllable> _splitWord(Word word, SyllableEntry plan) {

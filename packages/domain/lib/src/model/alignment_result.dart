@@ -25,4 +25,18 @@ class AlignmentResult {
   }
 
   bool get needsReview => syllables.any((s) => s.needsReview);
+
+  /// 建立對齊結果不可變快照（backend-design.md §3.2.1 介面 24～26）。
+  AlignmentResult copyWith({
+    List<Word>? words,
+    List<Syllable>? syllables,
+    String? source,
+    double? confidence,
+  }) =>
+      AlignmentResult(
+        words: words ?? this.words,
+        syllables: syllables ?? this.syllables,
+        source: source ?? this.source,
+        confidence: confidence ?? this.confidence,
+      );
 }

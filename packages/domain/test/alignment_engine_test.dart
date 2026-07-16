@@ -6,6 +6,55 @@ import 'package:test/test.dart';
 
 void main() {
   group('AlignmentEngine（task-split 3.1/3.3）', () {
+    test('AT-17-01 金標準回歸固定 11 音節、10 切點與時間戳', () {
+      final result = AlignmentEngine().alignWords([
+        Word(text: 'She', startMs: 0, endMs: 200, index: 0),
+        Word(text: 'has', startMs: 200, endMs: 400, index: 1),
+        Word(text: 'excellent', startMs: 400, endMs: 1000, index: 2),
+        Word(text: 'communication', startMs: 1000, endMs: 2000, index: 3),
+        Word(text: 'skills', startMs: 2000, endMs: 2300, index: 4),
+      ]);
+
+      expect(result.syllables, hasLength(11));
+      expect(
+        result.syllables.map((syllable) => syllable.text),
+        [
+          'she',
+          'has',
+          'ex',
+          'cel',
+          'lent',
+          'com',
+          'mu',
+          'ni',
+          'ca',
+          'tion',
+          'skills'
+        ],
+      );
+      expect(
+        result.syllables.map((syllable) => [syllable.startMs, syllable.endMs]),
+        [
+          [0, 200],
+          [200, 400],
+          [400, 600],
+          [600, 800],
+          [800, 1000],
+          [1000, 1200],
+          [1200, 1400],
+          [1400, 1600],
+          [1600, 1800],
+          [1800, 2000],
+          [2000, 2300],
+        ],
+      );
+      expect(
+        result.syllables.take(10).map((syllable) => syllable.endMs),
+        result.syllables.skip(1).map((syllable) => syllable.startMs),
+        reason: '11 音節應形成 10 個連續切點，不能產生間隙或重疊',
+      );
+    });
+
     test('金標準句切出 11 音節，communication 內部需覆核', () {
       final engine = AlignmentEngine();
       final result = engine.alignWords([

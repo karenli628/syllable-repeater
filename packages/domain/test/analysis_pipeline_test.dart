@@ -7,16 +7,45 @@ import 'package:test/test.dart';
 
 void main() {
   group('AnalysisPipeline（task-split 3.4）', () {
+    test('AT-17-01 v1 基線路徑保留金標準音節時間戳（容差基準 ±1ms）', () async {
+      final events = await _pipeline(
+        decoder: _FakeDecoder(_pcm(seconds: 3)),
+        transcriber: _FakeTranscriber((pcm, language, transcript) async {
+          return _goldWords;
+        }),
+      ).analyze(ImportRequest(audioPath: '/tmp/gold.wav')).toList();
+
+      final syllables = events.last.result!.syllables;
+      expect(syllables, hasLength(11));
+      expect(
+        syllables.map((syllable) => [syllable.startMs, syllable.endMs]),
+        [
+          [0, 200],
+          [200, 400],
+          [400, 600],
+          [600, 800],
+          [800, 1000],
+          [1000, 1200],
+          [1200, 1400],
+          [1400, 1600],
+          [1600, 1800],
+          [1800, 2000],
+          [2000, 2300],
+        ],
+      );
+    });
+
     test('依序回報階段，完成時帶 AlignmentResult 與 waveform peaks', () async {
       final pcm = _pcm(seconds: 3);
       final decoder = _FakeDecoder(pcm);
-      final transcriber = _FakeTranscriber((request, decodedPcm) async {
-        expect(request.transcript, 'She has excellent communication skills');
+      final transcriber =
+          _FakeTranscriber((decodedPcm, language, transcript) async {
+        expect(transcript, 'She has excellent communication skills');
+        expect(language, 'en');
         expect(decodedPcm, same(pcm));
         return _goldWords;
       });
-      final pipeline =
-          AnalysisPipeline(decoder: decoder, transcriber: transcriber);
+      final pipeline = _pipeline(decoder: decoder, transcriber: transcriber);
 
       final events = await pipeline
           .analyze(ImportRequest(
@@ -42,12 +71,51 @@ void main() {
       expect(events.last.error, isNull);
     });
 
+    test('AT-12-09 M1：分離軌只供分析，done 仍分別交還原音與 analysisPcm',
+        () async {
+      final original = Pcm(
+        Int16List.fromList(List<int>.filled(3000, 1200)),
+        sampleRate: 1000,
+      );
+      final vocals = Pcm(
+        Int16List.fromList(List<int>.filled(3000, 700)),
+        sampleRate: 1000,
+      );
+      final transcriber =
+          _FakeTranscriber((pcm, language, transcript) async {
+        expect(pcm, same(vocals), reason: 'ASR 應使用人聲分離 analysisPcm');
+        return _goldWords;
+      });
+      final pipeline = _pipeline(
+        decoder: _FakeDecoder(original),
+        transcriber: transcriber,
+        vocalSeparator: _FakeVocalSeparator(vocals),
+      );
+
+      final events = await pipeline
+          .analyze(ImportRequest(
+            audioPath: '/tmp/song.wav',
+            separateVocals: true,
+          ))
+          .toList();
+
+      expect(events.last.stage, AnalysisStage.done,
+          reason: 'pipeline error=${events.last.error}');
+      expect(events.last.decodedPcm, same(original),
+          reason: '播放／保存／匯出相容欄位必須維持原音');
+      expect(events.last.analysisPcm, same(vocals),
+          reason: '分析軌必須另欄明示，不得覆蓋原音');
+      expect(events.last.audioTracks!.originalPcm, same(original));
+      expect(events.last.audioTracks!.analysisPcm, same(vocals));
+      expect(events.last.waveformPeaks, isNotEmpty);
+    });
+
     test('分析中第二次呼叫回 ERR_ANALYSIS_IN_PROGRESS', () async {
       final decoder = _HoldingDecoder();
-      final transcriber =
-          _FakeTranscriber((request, decodedPcm) async => _goldWords);
-      final pipeline =
-          AnalysisPipeline(decoder: decoder, transcriber: transcriber);
+      final transcriber = _FakeTranscriber((pcm, language, transcript) async {
+        return _goldWords;
+      });
+      final pipeline = _pipeline(decoder: decoder, transcriber: transcriber);
       final firstEvents = <AnalysisEvent>[];
       final firstDone = Completer<void>();
 
@@ -72,9 +140,9 @@ void main() {
 
     test('轉寫失敗回 failed event，並保留已完成的解碼結果', () async {
       final pcm = _pcm(seconds: 3);
-      final pipeline = AnalysisPipeline(
+      final pipeline = _pipeline(
         decoder: _FakeDecoder(pcm),
-        transcriber: _FakeTranscriber((request, decodedPcm) async {
+        transcriber: _FakeTranscriber((decodedPcm, language, transcript) async {
           throw const DomainException(ErrorCodes.sidecarCrashed, '辨識引擎異常結束');
         }),
       );
@@ -91,9 +159,9 @@ void main() {
 
     test('failed event 帶 checkpoint（含已解碼 PCM），供「重試此階段」用', () async {
       final pcm = _pcm(seconds: 3);
-      final pipeline = AnalysisPipeline(
+      final pipeline = _pipeline(
         decoder: _FakeDecoder(pcm),
-        transcriber: _FakeTranscriber((request, decodedPcm) async {
+        transcriber: _FakeTranscriber((decodedPcm, language, transcript) async {
           throw const DomainException(ErrorCodes.sidecarCrashed, '辨識引擎異常結束');
         }),
       );
@@ -111,9 +179,10 @@ void main() {
     test('resume：帶 checkpoint.decodedPcm 時不重跑解碼', () async {
       final pcm = _pcm(seconds: 3);
       final decoder = _FakeDecoder(pcm);
-      final transcriber = _FakeTranscriber((r, d) async => _goldWords);
-      final pipeline =
-          AnalysisPipeline(decoder: decoder, transcriber: transcriber);
+      final transcriber = _FakeTranscriber((pcm, language, transcript) async {
+        return _goldWords;
+      });
+      final pipeline = _pipeline(decoder: decoder, transcriber: transcriber);
 
       final events = await pipeline
           .analyze(
@@ -124,8 +193,7 @@ void main() {
 
       expect(decoder.paths, isEmpty, reason: 'decoder 不應被呼叫');
       expect(events.first.stage, AnalysisStage.decoding);
-      expect(events.first.progress, 1,
-          reason: 'resume 應直接跳到 decoding(1) 收尾事件');
+      expect(events.first.progress, 1, reason: 'resume 應直接跳到 decoding(1) 收尾事件');
       expect(events.last.stage, AnalysisStage.done);
       expect(events.last.result!.syllables, hasLength(11));
     });
@@ -133,11 +201,11 @@ void main() {
     test('resume：帶 checkpoint.words 時不重跑轉寫', () async {
       final pcm = _pcm(seconds: 3);
       var transcribeCallCount = 0;
-      final transcriber = _FakeTranscriber((r, d) async {
+      final transcriber = _FakeTranscriber((pcm, language, transcript) async {
         transcribeCallCount++;
         return _goldWords;
       });
-      final pipeline = AnalysisPipeline(
+      final pipeline = _pipeline(
         decoder: _FakeDecoder(pcm),
         transcriber: transcriber,
       );
@@ -156,8 +224,65 @@ void main() {
       expect(events.last.stage, AnalysisStage.done);
       expect(events.last.result!.syllables, hasLength(11));
     });
+
+    test('AT-17-02：辨識 Registry 缺 ja 時在解碼前 fail-closed', () async {
+      final decoder = _FakeDecoder(_pcm(seconds: 3));
+      final pipeline = AnalysisPipeline(
+        decoder: decoder,
+        transcriberRegistry: TranscriberRegistry([
+          _FakeTranscriber(
+            (pcm, language, transcript) async => _goldWords,
+          ),
+        ]),
+        syllabifierRegistry: SyllabifierRegistry([EnglishSyllabifier()]),
+      );
+
+      final events = await pipeline
+          .analyze(ImportRequest(audioPath: '/tmp/ja.wav', language: 'ja'))
+          .toList();
+
+      expect(events, hasLength(1));
+      expect(events.single.stage, AnalysisStage.failed);
+      expect(events.single.error!.code, ErrorCodes.languageUnsupported);
+      expect(events.single.error!.message, contains('en'));
+      expect(decoder.paths, isEmpty, reason: '語言拒絕後不得開始解碼副作用');
+    });
+
+    test('AT-17-03：ASR 有 ja、切分器無 ja 時仍在解碼前拒絕', () async {
+      final decoder = _FakeDecoder(_pcm(seconds: 3));
+      final pipeline = AnalysisPipeline(
+        decoder: decoder,
+        transcriberRegistry: TranscriberRegistry([
+          _FakeTranscriber(
+            (pcm, language, transcript) async => _goldWords,
+            supportedLanguages: const {'en', 'ja'},
+          ),
+        ]),
+        syllabifierRegistry: SyllabifierRegistry([EnglishSyllabifier()]),
+      );
+
+      final events = await pipeline
+          .analyze(ImportRequest(audioPath: '/tmp/ja.wav', language: 'ja'))
+          .toList();
+
+      expect(events.single.error!.code, ErrorCodes.languageUnsupported);
+      expect(events.single.error!.message, contains('音節切分器'));
+      expect(decoder.paths, isEmpty, reason: '雙表缺任一不得產生副作用');
+    });
   });
 }
+
+AnalysisPipeline _pipeline({
+  required AnalysisAudioDecoder decoder,
+  required TranscriberEngine transcriber,
+  AnalysisVocalSeparator? vocalSeparator,
+}) =>
+    AnalysisPipeline(
+      decoder: decoder,
+      transcriberRegistry: TranscriberRegistry([transcriber]),
+      syllabifierRegistry: SyllabifierRegistry([EnglishSyllabifier()]),
+      vocalSeparator: vocalSeparator,
+    );
 
 class _FakeDecoder implements AnalysisAudioDecoder {
   final Pcm pcm;
@@ -181,18 +306,51 @@ class _HoldingDecoder implements AnalysisAudioDecoder {
   void complete(Pcm pcm) => _completer.complete(pcm);
 }
 
-class _FakeTranscriber implements AnalysisTranscriber {
-  final Future<List<Word>> Function(ImportRequest request, Pcm decodedPcm)
-      _behavior;
+class _FakeVocalSeparator implements AnalysisVocalSeparator {
+  final Pcm pcm;
 
-  _FakeTranscriber(this._behavior);
+  _FakeVocalSeparator(this.pcm);
+
+  @override
+  Future<SeparatedAudio> separate(
+    ImportRequest request, {
+    required Pcm decodedPcm,
+  }) async =>
+      SeparatedAudio(audioPath: '/tmp/vocals.wav', pcm: pcm);
+}
+
+class _FakeTranscriber implements TranscriberEngine {
+  final Future<List<Word>> Function(
+    Pcm pcm,
+    String language,
+    String? transcript,
+  ) _behavior;
+
+  @override
+  final Set<String> supportedLanguages;
+
+  _FakeTranscriber(
+    this._behavior, {
+    this.supportedLanguages = const {'en'},
+  });
+
+  @override
+  String get engineName => 'fake-local';
+
+  @override
+  Future<List<Segment>> segment(
+    Pcm pcm, {
+    required String language,
+  }) async =>
+      const [];
 
   @override
   Future<List<Word>> transcribe(
-    ImportRequest request, {
-    required Pcm decodedPcm,
+    Pcm pcm, {
+    required String language,
+    String? transcript,
   }) =>
-      _behavior(request, decodedPcm);
+      _behavior(pcm, language, transcript);
 }
 
 Pcm _pcm({required int seconds}) => Pcm(Int16List(44100 * seconds));

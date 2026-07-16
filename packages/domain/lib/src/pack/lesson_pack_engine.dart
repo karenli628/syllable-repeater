@@ -10,7 +10,8 @@ import '../ports/file_io.dart';
 
 /// `.abopack` 讀寫與全檔結構驗證（backend-design.md §3.2.5 介面 9/10）。
 class LessonPackEngine {
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
+  static const int legacySchemaVersion = 1;
   static const String manifestPath = 'manifest.json';
 
   final FileIo fileIo;
@@ -52,7 +53,8 @@ class LessonPackEngine {
       if (manifestJson is! Map<String, dynamic>) {
         throw _packCorrupted();
       }
-      if (manifestJson['schemaVersion'] != schemaVersion) {
+      final version = manifestJson['schemaVersion'];
+      if (version != schemaVersion && version != legacySchemaVersion) {
         throw _packCorrupted();
       }
 

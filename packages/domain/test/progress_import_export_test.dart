@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:domain/domain.dart';
 import 'package:test/test.dart';
 
@@ -35,8 +36,9 @@ void main() {
       final path = await engine.exportProgress('/tmp/local.aboprogress');
 
       expect(path, '/tmp/local.aboprogress');
-      final json =
-          jsonDecode(utf8.decode(fileIo.bytesAt(path))) as Map<String, dynamic>;
+      final archive = ZipDecoder().decodeBytes(fileIo.bytesAt(path));
+      expect(archive.files.map((file) => file.name), ['progress.json']);
+      final json = _progressJson(fileIo.bytesAt(path));
       expect(json['schemaVersion'], 1);
       expect(json['progress']['profileId'], 'profile-local');
       expect(json['progress']['courseId'], 'course-local');
@@ -45,13 +47,87 @@ void main() {
       expect(json['progress']['srsStates'], hasLength(1));
       expect(json['progress']['attempts'], hasLength(1));
 
-      final text = utf8.decode(fileIo.bytesAt(path), allowMalformed: true);
+      final text = jsonEncode(json);
       expect(text.toLowerCase(), isNot(contains('api_key')));
       expect(text.toLowerCase(), isNot(contains('secret')));
       expect(text.toLowerCase(), isNot(contains('password')));
       expect(text.toLowerCase(), isNot(contains('credential')));
       expect(text.toLowerCase(), isNot(contains('audio')));
+      expect(text.toLowerCase(), isNot(contains('recording_buffer')));
+      expect(text.toLowerCase(), isNot(contains('recording-')));
+      expect(text.toLowerCase(), isNot(contains('pcmpath')));
+      expect(text.toLowerCase(), isNot(contains('recordingpath')));
+      expect(text.toLowerCase(), isNot(contains('.pcm')));
+      expect(text.toLowerCase(), isNot(contains('.wav')));
       expect(text, isNot(contains('/Users/')));
+      _expectNoRecordingFields(json['progress']);
+    });
+
+    test('AT-19-03/04 顯示偏好隨 `.aboprogress` 匯出／匯入並維持 Lesson 隔離', () async {
+      final fileIo = _MemoryFileIo();
+      final incomingRepository = _MemoryProgressRepository(
+        snapshot: ProgressSnapshot(
+          profileId: 'profile-local',
+          courseId: 'course-local',
+          lessonContentHashes: const {
+            'lesson-a': 'hash-a',
+            'lesson-b': 'hash-b',
+          },
+          transcriptDisplayModes: const {
+            'lesson-a': TranscriptDisplayMode.translationOnly,
+            'lesson-b': TranscriptDisplayMode.hidden,
+          },
+          groups: const [],
+          srsStates: const [],
+          attempts: const [],
+        ),
+      );
+      final incomingEngine = ProgressEngine(
+        repository: incomingRepository,
+        clock: _FakeClock(DateTime.utc(2026, 7, 13, 10)),
+        fileIo: fileIo,
+      );
+      await incomingEngine.exportProgress('/tmp/display.aboprogress');
+
+      final exported =
+          _progressJson(fileIo.bytesAt('/tmp/display.aboprogress'));
+      expect(exported['progress']['transcriptDisplayModes'], {
+        'lesson-a': 'translationOnly',
+        'lesson-b': 'hidden',
+      });
+
+      final localRepository = _MemoryProgressRepository(
+        snapshot: ProgressSnapshot(
+          profileId: 'profile-local',
+          courseId: 'course-local',
+          lessonContentHashes: const {
+            'lesson-a': 'hash-a',
+            'lesson-b': 'hash-b',
+          },
+          transcriptDisplayModes: const {
+            'lesson-a': TranscriptDisplayMode.transcript,
+          },
+          groups: const [],
+          srsStates: const [],
+          attempts: const [],
+        ),
+      );
+      final localEngine = ProgressEngine(
+        repository: localRepository,
+        clock: _FakeClock(DateTime.utc(2026, 7, 13, 10)),
+        fileIo: fileIo,
+      );
+
+      await localEngine.importProgress('/tmp/display.aboprogress');
+
+      expect(localRepository.snapshot.transcriptDisplayModes, {
+        'lesson-a': TranscriptDisplayMode.translationOnly,
+        'lesson-b': TranscriptDisplayMode.hidden,
+      });
+      expect(
+        localRepository.snapshot.transcriptModeForLesson('lesson-c'),
+        TranscriptDisplayMode.transcript,
+      );
     });
 
     test('AT-08-03 incoming updatedAt 較新時覆寫本機版本', () async {
@@ -237,13 +313,49 @@ void main() {
   });
 }
 
+void _expectNoRecordingFields(Object? value) {
+  if (value is Map) {
+    for (final entry in value.entries) {
+      final key = entry.key.toString().toLowerCase();
+      expect(key, isNot(contains('recording')));
+      expect(key, isNot(contains('pcm')));
+      expect(key, isNot(contains('path')));
+      _expectNoRecordingFields(entry.value);
+    }
+  } else if (value is Iterable) {
+    for (final item in value) {
+      _expectNoRecordingFields(item);
+    }
+  }
+}
+
 Uint8List _progressFile(ProgressSnapshot snapshot) => Uint8List.fromList(
-      utf8.encode(jsonEncode({
+      ZipEncoder().encode(
+        Archive()
+          ..addFile(
+            ArchiveFile(
+              'progress.json',
+              _progressJsonBytes(snapshot).length,
+              _progressJsonBytes(snapshot),
+            ),
+          ),
+      )!,
+    );
+
+List<int> _progressJsonBytes(ProgressSnapshot snapshot) => utf8.encode(
+      jsonEncode({
         'schemaVersion': 1,
         'exportedAt': DateTime.utc(2026, 7, 6, 9).toIso8601String(),
         'progress': snapshot.toJson(),
-      })),
+      }),
     );
+
+Map<String, dynamic> _progressJson(Uint8List bytes) {
+  final archive = ZipDecoder().decodeBytes(bytes);
+  final entry = archive.findFile('progress.json')!;
+  final content = List<int>.from(entry.content as List<dynamic>);
+  return jsonDecode(utf8.decode(content)) as Map<String, dynamic>;
+}
 
 PracticeGroup _group(
   String id, {

@@ -11,7 +11,7 @@ class DomainException implements Exception {
   String toString() => 'DomainException($code): $message';
 }
 
-/// 錯誤碼常數——與 backend-design.md §3.2.8 一一對應（19 碼）。
+/// 錯誤碼常數——與 backend-design.md §3.2.8 一一對應（v1 19 碼＋v1.1 7 碼）。
 abstract final class ErrorCodes {
   static const unsupportedFormat = 'ERR_UNSUPPORTED_FORMAT';
   static const fileTooLong = 'ERR_FILE_TOO_LONG';
@@ -32,4 +32,43 @@ abstract final class ErrorCodes {
   static const aiKeyMissing = 'ERR_AI_KEY_MISSING';
   static const aiCallFailed = 'ERR_AI_CALL_FAILED';
   static const archiveRestoreExpired = 'ERR_ARCHIVE_RESTORE_EXPIRED';
+
+  // v1.1 backend-design §3.2.8；新增碼必須同步 ErrorMessages。
+  static const languageUnsupported = 'ERR_LANGUAGE_UNSUPPORTED';
+  static const labelCorrupted = 'ERR_LABEL_CORRUPTED';
+  static const labelFingerprintMismatch = 'ERR_LABEL_FINGERPRINT_MISMATCH';
+  static const segmentTooClose = 'ERR_SEGMENT_TOO_CLOSE';
+  static const boundaryTooClose = 'ERR_BOUNDARY_TOO_CLOSE';
+  static const syllableMinCount = 'ERR_SYLLABLE_MIN_COUNT';
+  static const blockConfigOutOfRange = 'ERR_BLOCK_CONFIG_OUT_OF_RANGE';
+
+  /// 完整錯誤碼集合，供三同步碼數斷言使用。
+  static const all = <String>[
+    unsupportedFormat,
+    fileTooLong,
+    decodeFailed,
+    transcribeFailed,
+    separateFailed,
+    sidecarCrashed,
+    sidecarTimeout,
+    analysisInProgress,
+    boundaryInvalid,
+    repeatNOutOfRange,
+    exportDestUnwritable,
+    exportInProgress,
+    recordingTooShort,
+    micPermissionDenied,
+    packCorrupted,
+    progressCorrupted,
+    aiKeyMissing,
+    aiCallFailed,
+    archiveRestoreExpired,
+    languageUnsupported,
+    labelCorrupted,
+    labelFingerprintMismatch,
+    segmentTooClose,
+    boundaryTooClose,
+    syllableMinCount,
+    blockConfigOutOfRange,
+  ];
 }

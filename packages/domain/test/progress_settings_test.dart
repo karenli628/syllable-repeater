@@ -83,6 +83,97 @@ void main() {
       expect(audit.metadata, {'timeoutSeconds': '180'});
     });
   });
+
+  group('TranscriptDisplayMode（Task 7.1 / AT-19-03/04）', () {
+    test('缺少 lesson 偏好時預設 transcript，且不同 lesson 相互隔離', () {
+      final snapshot = ProgressSnapshot(
+        profileId: 'profile-local',
+        courseId: 'course-local',
+        lessonContentHashes: const {'lesson-a': 'hash-a'},
+        groups: const [],
+        srsStates: const [],
+        attempts: const [],
+        transcriptDisplayModes: const {
+          'lesson-a': TranscriptDisplayMode.translationOnly,
+        },
+      );
+
+      expect(
+        snapshot.transcriptModeForLesson('lesson-a'),
+        TranscriptDisplayMode.translationOnly,
+      );
+      expect(
+        snapshot.transcriptModeForLesson('lesson-b'),
+        TranscriptDisplayMode.transcript,
+      );
+    });
+
+    test('偏好欄位可隨 ProgressSnapshot JSON 往返，舊檔缺欄仍預設 transcript', () {
+      final snapshot = ProgressSnapshot(
+        profileId: 'profile-local',
+        courseId: 'course-local',
+        lessonContentHashes: const {'lesson-a': 'hash-a'},
+        groups: const [],
+        srsStates: const [],
+        attempts: const [],
+        transcriptDisplayModes: const {
+          'lesson-a': TranscriptDisplayMode.transcriptWithTranslation,
+          'lesson-b': TranscriptDisplayMode.hidden,
+        },
+      );
+
+      final decoded = ProgressSnapshot.fromJson(snapshot.toJson());
+      expect(decoded.transcriptDisplayModes, {
+        'lesson-a': TranscriptDisplayMode.transcriptWithTranslation,
+        'lesson-b': TranscriptDisplayMode.hidden,
+      });
+
+      final legacyJson = snapshot.toJson()..remove('transcriptDisplayModes');
+      final legacy = ProgressSnapshot.fromJson(legacyJson);
+      expect(
+        legacy.transcriptModeForLesson('lesson-a'),
+        TranscriptDisplayMode.transcript,
+      );
+    });
+
+    test('SettingsService 契約可設定並讀回每課件模式', () async {
+      final service = _MemorySettingsService();
+
+      expect(
+        await service.getTranscriptMode('lesson-a'),
+        TranscriptDisplayMode.transcript,
+      );
+      await service.setTranscriptMode(
+        'lesson-a',
+        TranscriptDisplayMode.translationOnly,
+      );
+
+      expect(
+        await service.getTranscriptMode('lesson-a'),
+        TranscriptDisplayMode.translationOnly,
+      );
+      expect(
+        await service.getTranscriptMode('lesson-b'),
+        TranscriptDisplayMode.transcript,
+      );
+    });
+  });
+}
+
+class _MemorySettingsService implements SettingsService {
+  final Map<String, TranscriptDisplayMode> values = {};
+
+  @override
+  Future<TranscriptDisplayMode> getTranscriptMode(String lessonId) async =>
+      values[lessonId] ?? TranscriptDisplayMode.transcript;
+
+  @override
+  Future<void> setTranscriptMode(
+    String lessonId,
+    TranscriptDisplayMode mode,
+  ) async {
+    values[lessonId] = mode;
+  }
 }
 
 class _SettingsRepository implements ProgressRepository {

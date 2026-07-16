@@ -1,6 +1,7 @@
 // AI-Generate
 // RecordingComparator TDD-red 測試（task-split 6.1/6.2）。
 // 對應 requirement REQ-06 AT-06-01/02/04 與 CT-10。
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -98,7 +99,7 @@ List<double> _normalizedSamples(Pcm pcm) =>
 
 void main() {
   group('RecordingComparator（task-split 6.1/6.2，REQ-06）', () {
-    test('6.1 依 step 時間戳從整句原音切出正確基準片段，成功後刪錄音', () async {
+    test('AT-18-02 成功比對後 finally 刪除錄音來源', () async {
       final audio = _FakeRecordingAudioSource();
       final original = _indexedPcm();
       final steps =
@@ -141,7 +142,7 @@ void main() {
       expect(audio.deleted, contains('/tmp/short.wav'));
     });
 
-    test('CT-10 解碼失敗時仍 finally 刪錄音', () async {
+    test('AT-18-02／CT-10 解碼失敗時仍 finally 刪錄音', () async {
       final audio = _FakeRecordingAudioSource()
         ..readFailures.add('/tmp/bad.wav');
       final step =
@@ -188,6 +189,92 @@ void main() {
       expect(result.rhythmDelta, greaterThanOrEqualTo(0));
       expect(result.intonationDelta, greaterThan(0));
       expect(audio.deleted, contains('/tmp/long.wav'));
+    });
+
+    test('AT-06-08 比對基準只取單次原音，不使用單元循環次數', () async {
+      final audio = _FakeRecordingAudioSource();
+      final syllable = Syllable(
+        text: 'once',
+        startMs: 0,
+        endMs: 500,
+        wordIndex: 0,
+        needsReview: false,
+      );
+      final original = _sinePcm(durationMs: 500);
+      final repeatedStep = PracticeEngine().buildSteps([syllable], 3).single;
+      audio.recordings['/tmp/once.wav'] = original;
+
+      final result = await RecordingComparator(audioSource: audio).compare(
+        '/tmp/once.wav',
+        [syllable],
+        repeatedStep,
+        original,
+      );
+
+      expect(result.overlayData.referenceWave, hasLength(500));
+      expect(result.overlayData.userWave, hasLength(500));
+    });
+
+    test('AT-18-03 長錄音背景比對且圖表降採樣至 1000 點內', () async {
+      final audio = _FakeRecordingAudioSource();
+      final syllable = Syllable(
+        text: 'long',
+        startMs: 0,
+        endMs: 10000,
+        wordIndex: 0,
+        needsReview: false,
+      );
+      final original = _sinePcm(durationMs: 10000, sampleRate: 44100);
+      audio.recordings['/tmp/chart.wav'] = original;
+      var heartbeatCount = 0;
+      final heartbeat = Timer.periodic(
+        const Duration(milliseconds: 1),
+        (_) => heartbeatCount++,
+      );
+
+      final result = await RecordingComparator(audioSource: audio).compare(
+        '/tmp/chart.wav',
+        [syllable],
+        PracticeEngine().buildSteps([syllable], 1).single,
+        original,
+      );
+      heartbeat.cancel();
+
+      expect(heartbeatCount, greaterThan(0), reason: '比對不得阻塞 UI isolate');
+      expect(result.overlayData.referenceWave.length, lessThanOrEqualTo(1000));
+      expect(result.overlayData.userWave.length, lessThanOrEqualTo(1000));
+    });
+
+    test('AT-18-04 降採樣保留首尾與每桶正負尖峰', () async {
+      final samples = Int16List(2000);
+      samples[0] = 1111;
+      samples[1] = -32000;
+      samples[2] = 32000;
+      samples[samples.length - 1] = 2222;
+      final pcm = Pcm(samples, sampleRate: 1000);
+      final audio = _FakeRecordingAudioSource()
+        ..recordings['/tmp/peaks.wav'] = pcm;
+      final syllable = Syllable(
+        text: 'peaks',
+        startMs: 0,
+        endMs: 2000,
+        wordIndex: 0,
+        needsReview: false,
+      );
+
+      final result = await RecordingComparator(audioSource: audio).compare(
+        '/tmp/peaks.wav',
+        [syllable],
+        PracticeEngine().buildSteps([syllable], 1).single,
+        pcm,
+      );
+      final wave = result.overlayData.userWave;
+
+      expect(wave.length, lessThanOrEqualTo(1000));
+      expect(wave.first, 1111 / 32768.0);
+      expect(wave.last, 2222 / 32768.0);
+      expect(wave, contains(-32000 / 32768.0));
+      expect(wave, contains(32000 / 32768.0));
     });
   });
 }

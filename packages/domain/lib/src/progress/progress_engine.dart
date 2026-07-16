@@ -2,6 +2,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
+
 import '../errors.dart';
 import '../model/audit_log.dart';
 import '../model/progress.dart';
@@ -15,6 +17,7 @@ import '../ports/progress_repository.dart';
 /// （backend-design.md §3.2.6 介面 13-16）。
 class ProgressEngine {
   static const int progressSchemaVersion = 1;
+  static const String progressEntryPath = 'progress.json';
   static const List<int> intervalDays = [0, 1, 3, 7, 14, 30];
   static const Duration archiveRestoreWindow = Duration(hours: 168);
 
@@ -251,9 +254,22 @@ class ProgressEngine {
       'exportedAt': clock.now().toUtc().toIso8601String(),
       'progress': snapshot.toJson(),
     };
+    final progressBytes = utf8.encode(jsonEncode(document));
+    final archive = Archive()
+      ..addFile(
+        ArchiveFile(
+          progressEntryPath,
+          progressBytes.length,
+          progressBytes,
+        ),
+      );
+    final encoded = ZipEncoder().encode(archive);
+    if (encoded == null) {
+      throw _progressCorrupted();
+    }
     await _requireFileIo().writeBytesAtomic(
       destPath,
-      Uint8List.fromList(utf8.encode(jsonEncode(document))),
+      Uint8List.fromList(encoded),
     );
     return destPath;
   }
@@ -293,10 +309,7 @@ class ProgressEngine {
   Future<ProgressSnapshot> _readProgressSnapshot(String path) async {
     try {
       final bytes = await _requireFileIo().readBytes(path);
-      final decoded = jsonDecode(utf8.decode(bytes));
-      if (decoded is! Map<String, dynamic>) {
-        throw _progressCorrupted();
-      }
+      final decoded = _decodeProgressDocument(bytes);
       if (decoded['schemaVersion'] != progressSchemaVersion) {
         throw _progressCorrupted();
       }
@@ -312,6 +325,31 @@ class ProgressEngine {
       throw _progressCorrupted();
     } catch (_) {
       throw _progressCorrupted();
+    }
+  }
+
+  Map<String, dynamic> _decodeProgressDocument(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final entry = archive.findFile(progressEntryPath);
+      if (entry == null || !entry.isFile) {
+        throw _progressCorrupted();
+      }
+      final content = Uint8List.fromList(
+        List<int>.from(entry.content as List<dynamic>),
+      );
+      final decoded = jsonDecode(utf8.decode(content));
+      if (decoded is! Map<String, dynamic>) {
+        throw _progressCorrupted();
+      }
+      return decoded;
+    } catch (_) {
+      // 2026-07-12 前的預發布版本曾誤寫純 JSON；匯入端保留相容讀取。
+      final legacy = jsonDecode(utf8.decode(bytes));
+      if (legacy is! Map<String, dynamic>) {
+        throw _progressCorrupted();
+      }
+      return legacy;
     }
   }
 
@@ -341,11 +379,19 @@ class ProgressEngine {
       }
     }
 
+    // 顯示偏好屬個人層設定，不跟著課件 contentHash 重置；匯入檔有同一
+    // Lesson key 時由匯入值覆寫，未帶到的本機偏好保留。
+    final transcriptDisplayModes = <String, TranscriptDisplayMode>{
+      ...local.transcriptDisplayModes,
+      ...incoming.transcriptDisplayModes,
+    };
+
     return _ProgressMergeResult(
       snapshot: ProgressSnapshot(
         profileId: local.profileId,
         courseId: local.courseId,
         lessonContentHashes: hashes,
+        transcriptDisplayModes: transcriptDisplayModes,
         groups: groupMerge.groups,
         srsStates: stateMerge.states,
         attempts: attemptMerge.attempts,

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import 'practice_config.dart';
+import 'practice_arrangement.dart';
 import 'prosody.dart';
 import 'syllable.dart';
 import 'translation.dart';
@@ -17,6 +18,7 @@ import 'word.dart';
 class Lesson {
   final String id;
   final String title;
+  final String language;
   final String audioRelPath;
   final Uint8List originalAudioBytes;
   final String contentHash;
@@ -25,11 +27,13 @@ class Lesson {
   final List<Translation> translations;
   final Prosody? prosody;
   final PracticeConfig practiceConfig;
+  final PracticeArrangement? arrangement;
   final DateTime updatedAt;
 
   Lesson({
     required this.id,
     required this.title,
+    this.language = 'en',
     required this.audioRelPath,
     required Uint8List originalAudioBytes,
     required this.contentHash,
@@ -38,6 +42,7 @@ class Lesson {
     required List<Translation> translations,
     required this.prosody,
     required this.practiceConfig,
+    this.arrangement,
     required this.updatedAt,
   })  : originalAudioBytes = Uint8List.fromList(originalAudioBytes),
         words = List.unmodifiable(words),
@@ -48,6 +53,9 @@ class Lesson {
     }
     if (title.trim().isEmpty) {
       throw ArgumentError('Lesson.title 不可空白');
+    }
+    if (language.trim().isEmpty) {
+      throw ArgumentError('Lesson.language 不可空白');
     }
     _validateRelativePackPath(audioRelPath);
     if (originalAudioBytes.isEmpty) {
@@ -66,6 +74,7 @@ class Lesson {
   Lesson copyWith({
     String? id,
     String? title,
+    String? language,
     String? audioRelPath,
     Uint8List? originalAudioBytes,
     String? contentHash,
@@ -74,11 +83,13 @@ class Lesson {
     List<Translation>? translations,
     Prosody? prosody,
     PracticeConfig? practiceConfig,
+    Object? arrangement = _unset,
     DateTime? updatedAt,
   }) =>
       Lesson(
         id: id ?? this.id,
         title: title ?? this.title,
+        language: language ?? this.language,
         audioRelPath: audioRelPath ?? this.audioRelPath,
         originalAudioBytes: originalAudioBytes ?? this.originalAudioBytes,
         contentHash: contentHash ?? this.contentHash,
@@ -87,6 +98,9 @@ class Lesson {
         translations: translations ?? this.translations,
         prosody: prosody ?? this.prosody,
         practiceConfig: practiceConfig ?? this.practiceConfig,
+        arrangement: identical(arrangement, _unset)
+            ? this.arrangement
+            : arrangement as PracticeArrangement?,
         updatedAt: updatedAt ?? this.updatedAt,
       );
 
@@ -101,6 +115,7 @@ class Lesson {
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
+        'language': language,
         'audioRelPath': audioRelPath,
         'contentHash': contentHash,
         'words': words.map(_wordToJson).toList(growable: false),
@@ -109,6 +124,7 @@ class Lesson {
             translations.map((t) => t.toJson()).toList(growable: false),
         'prosody': prosody == null ? null : _prosodyToJson(prosody!),
         'practiceConfig': practiceConfig.toJson(),
+        'arrangement': arrangement?.toJson(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
 
@@ -119,6 +135,7 @@ class Lesson {
       Lesson(
         id: json['id'] as String,
         title: json['title'] as String,
+        language: (json['language'] as String?) ?? 'en',
         audioRelPath: json['audioRelPath'] as String,
         originalAudioBytes: originalAudioBytes,
         contentHash: json['contentHash'] as String,
@@ -136,6 +153,10 @@ class Lesson {
             : _prosodyFromJson(json['prosody'] as Map<String, dynamic>),
         practiceConfig: PracticeConfig.fromJson(
             json['practiceConfig'] as Map<String, dynamic>),
+        arrangement: json['arrangement'] == null
+            ? null
+            : PracticeArrangement.fromJson(
+                json['arrangement'] as Map<String, dynamic>),
         updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
       );
 
@@ -172,6 +193,7 @@ Word _wordFromJson(Map<String, dynamic> json) => Word(
 
 Map<String, dynamic> _syllableToJson(Syllable syllable) => {
       'text': syllable.text,
+      if (syllable.originalText != null) 'originalText': syllable.originalText,
       'startMs': syllable.startMs,
       'endMs': syllable.endMs,
       'wordIndex': syllable.wordIndex,
@@ -180,6 +202,7 @@ Map<String, dynamic> _syllableToJson(Syllable syllable) => {
 
 Syllable _syllableFromJson(Map<String, dynamic> json) => Syllable(
       text: json['text'] as String,
+      originalText: json['originalText'] as String?,
       startMs: json['startMs'] as int,
       endMs: json['endMs'] as int,
       wordIndex: json['wordIndex'] as int,
@@ -203,3 +226,5 @@ Prosody _prosodyFromJson(Map<String, dynamic> json) => Prosody(
           : (json['pitchContour'] as List<dynamic>).cast<double>(),
       pitchAvailable: json['pitchAvailable'] as bool,
     );
+
+const _unset = Object();

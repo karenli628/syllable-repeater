@@ -234,6 +234,31 @@ void main() {
       expect(_texts(steps[3]), ['you', 've', 'ry', 'much']);
       expect(_texts(steps[4]), ['thank', 'you', 've', 'ry', 'much']);
     });
+
+    test('AT-13-07 金標準刪 1 切點後為 10 步，且每步仍是句尾後綴', () {
+      final alignment = _goldenAlignment();
+      final edited = AlignmentEngine().removeBoundary(alignment, 0);
+      final steps = PracticeEngine().buildSteps(edited.syllables, 3);
+
+      expect(steps, hasLength(10));
+      _expectEveryStepIsSuffix(steps, edited.syllables);
+      expect(_texts(steps[1]), ['tion', 'skills']);
+    });
+
+    test('AT-16-04 金標準加 1 切點後為 12 步，M2 與 tion skills 不變', () {
+      final alignment = _goldenAlignment();
+      final edited = AlignmentEngine().insertBoundary(
+        alignment,
+        0,
+        100,
+        pcm: _indexedPcm(durationMs: 3150),
+      );
+      final steps = PracticeEngine().buildSteps(edited.syllables, 3);
+
+      expect(steps, hasLength(12));
+      _expectEveryStepIsSuffix(steps, edited.syllables);
+      expect(_texts(steps[1]), ['tion', 'skills']);
+    });
   });
 
   group('PracticeEngine.renderStep（task-split 4.3，CT-01）', () {
@@ -290,4 +315,32 @@ void main() {
       expect(step.totalDurationMs, 500);
     });
   });
+}
+
+AlignmentResult _goldenAlignment() => AlignmentResult(
+      words: [
+        Word(
+          text: 'She has excellent communication skills',
+          startMs: 0,
+          endMs: 3150,
+          index: 0,
+        ),
+      ],
+      syllables: _goldenSentenceSyllables(),
+      source: 'golden-fixture',
+      confidence: 1,
+    );
+
+void _expectEveryStepIsSuffix(
+  List<PracticeStep> steps,
+  List<Syllable> syllables,
+) {
+  for (var index = 0; index < steps.length; index++) {
+    final count = index + 1;
+    expect(
+      steps[index].syllables,
+      syllables.sublist(syllables.length - count),
+      reason: '第 $count 步必須等於句尾倒數 $count 個音節',
+    );
+  }
 }

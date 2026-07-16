@@ -1,4 +1,5 @@
 // AI-Generate
+import 'dart:isolate';
 import 'dart:math' as math;
 
 import '../errors.dart';
@@ -41,40 +42,52 @@ class RecordingComparator {
         );
       }
 
-      final referencePcm =
-          practiceEngine.renderExportStep(step, originalPcm).pcm;
-      final userWave = _normalizedWave(userPcm);
-      final referenceWave = _normalizedWave(referencePcm);
-      final userRhythmCurve = _rmsCurve(userPcm, maxBuckets: 160);
-      final referenceRhythmCurve = _rmsCurve(referencePcm, maxBuckets: 160);
-      final userPitch = _pitchContour(userPcm);
-      final referencePitch = _pitchContour(referencePcm);
-
-      final rhythmDelta =
-          _normalizedDtwDistance(userRhythmCurve, referenceRhythmCurve);
-      final intonationDelta = userPitch.isEmpty || referencePitch.isEmpty
-          ? 0.0
-          : _normalizedDtwDistance(userPitch, referencePitch);
-
-      return ComparisonResult(
-        rhythmDelta: rhythmDelta,
-        intonationDelta: intonationDelta,
-        overlayData: OverlayData(
-          userWave: userWave,
-          referenceWave: referenceWave,
-          userPitch: userPitch,
-          referencePitch: referencePitch,
-          diffRanges: _diffRanges(
-            _waveCurve(userPcm, maxBuckets: 160),
-            _waveCurve(referencePcm, maxBuckets: 160),
-            referenceDurationMs: referencePcm.durationMs,
-          ),
-        ),
-        score: _score(rhythmDelta, intonationDelta),
+      // AT-06-08：錄音比對永遠只比較使用者的一次發音，不套用播放／
+      // 匯出的積木、整列或單元循環次數。
+      final referencePcm = practiceEngine.renderStep(step, originalPcm);
+      // AT-18-03：pitch、DTW 與圖表限點都在背景 isolate 完成，
+      // 避免 10 秒錄音的數十萬 samples 阻塞 Flutter UI isolate。
+      return await Isolate.run(
+        () => _comparePcm(referencePcm: referencePcm, userPcm: userPcm),
       );
     } finally {
       await audioSource.delete(userRecordingPath);
     }
+  }
+
+  static ComparisonResult _comparePcm({
+    required Pcm referencePcm,
+    required Pcm userPcm,
+  }) {
+    final userWave = _normalizedWave(userPcm);
+    final referenceWave = _normalizedWave(referencePcm);
+    final userRhythmCurve = _rmsCurve(userPcm, maxBuckets: 160);
+    final referenceRhythmCurve = _rmsCurve(referencePcm, maxBuckets: 160);
+    final userPitch = _pitchContour(userPcm);
+    final referencePitch = _pitchContour(referencePcm);
+
+    final rhythmDelta =
+        _normalizedDtwDistance(userRhythmCurve, referenceRhythmCurve);
+    final intonationDelta = userPitch.isEmpty || referencePitch.isEmpty
+        ? 0.0
+        : _normalizedDtwDistance(userPitch, referencePitch);
+
+    return ComparisonResult(
+      rhythmDelta: rhythmDelta,
+      intonationDelta: intonationDelta,
+      overlayData: OverlayData(
+        userWave: userWave,
+        referenceWave: referenceWave,
+        userPitch: userPitch,
+        referencePitch: referencePitch,
+        diffRanges: _diffRanges(
+          _waveCurve(userPcm, maxBuckets: 160),
+          _waveCurve(referencePcm, maxBuckets: 160),
+          referenceDurationMs: referencePcm.durationMs,
+        ),
+      ),
+      score: _score(rhythmDelta, intonationDelta),
+    );
   }
 
   void _validateStepSyllables(List<Syllable> syllables, PracticeStep step) {
@@ -88,13 +101,38 @@ class RecordingComparator {
     }
   }
 
-  List<double> _normalizedWave(Pcm pcm) {
-    return List<double>.unmodifiable(
-      pcm.samples.map((sample) => sample / 32768.0),
-    );
+  static List<double> _normalizedWave(Pcm pcm) {
+    const maxChartPoints = 1000;
+    if (pcm.samples.length <= maxChartPoints) {
+      return List<double>.unmodifiable(
+        pcm.samples.map((sample) => sample / 32768.0),
+      );
+    }
+
+    // AT-18-04：首尾各保留一點；其餘 998 點以 499 桶保留 min/max，
+    // 避免均勻抽樣漏掉中間尖峰，同時維持固定 UI 資料上限。
+    const bucketCount = (maxChartPoints - 2) ~/ 2;
+    final points = <double>[pcm.samples.first / 32768.0];
+    final interiorLength = pcm.samples.length - 2;
+    for (var bucket = 0; bucket < bucketCount; bucket++) {
+      final start = 1 + bucket * interiorLength ~/ bucketCount;
+      final end = 1 + (bucket + 1) * interiorLength ~/ bucketCount;
+      var minIndex = start;
+      var maxIndex = start;
+      for (var index = start + 1; index < end; index++) {
+        if (pcm.samples[index] < pcm.samples[minIndex]) minIndex = index;
+        if (pcm.samples[index] > pcm.samples[maxIndex]) maxIndex = index;
+      }
+      final first = minIndex <= maxIndex ? minIndex : maxIndex;
+      final second = minIndex <= maxIndex ? maxIndex : minIndex;
+      points.add(pcm.samples[first] / 32768.0);
+      if (second != first) points.add(pcm.samples[second] / 32768.0);
+    }
+    points.add(pcm.samples.last / 32768.0);
+    return List<double>.unmodifiable(points);
   }
 
-  List<double> _rmsCurve(Pcm pcm, {required int maxBuckets}) {
+  static List<double> _rmsCurve(Pcm pcm, {required int maxBuckets}) {
     if (pcm.samples.isEmpty) {
       return const [];
     }
@@ -108,7 +146,7 @@ class RecordingComparator {
     return List.unmodifiable(curve);
   }
 
-  List<double> _waveCurve(Pcm pcm, {required int maxBuckets}) {
+  static List<double> _waveCurve(Pcm pcm, {required int maxBuckets}) {
     if (pcm.samples.isEmpty) {
       return const [];
     }
@@ -123,7 +161,7 @@ class RecordingComparator {
     return List.unmodifiable(curve);
   }
 
-  double _normalizedRms(Pcm pcm, int start, int end) {
+  static double _normalizedRms(Pcm pcm, int start, int end) {
     var sumSquares = 0.0;
     for (var i = start; i < end && i < pcm.samples.length; i++) {
       final normalized = pcm.samples[i] / 32768.0;
@@ -132,7 +170,7 @@ class RecordingComparator {
     return math.sqrt(sumSquares / math.max(1, end - start));
   }
 
-  List<double> _pitchContour(Pcm pcm) {
+  static List<double> _pitchContour(Pcm pcm) {
     if (pcm.samples.isEmpty) {
       return const [];
     }
@@ -164,7 +202,7 @@ class RecordingComparator {
     return List.unmodifiable(pitches);
   }
 
-  double _autocorrelationScore(
+  static double _autocorrelationScore(
     Pcm pcm,
     int start,
     int windowSamples,
@@ -186,7 +224,7 @@ class RecordingComparator {
     return cross / math.sqrt(energyA * energyB);
   }
 
-  double _normalizedDtwDistance(List<double> a, List<double> b) {
+  static double _normalizedDtwDistance(List<double> a, List<double> b) {
     if (a.isEmpty || b.isEmpty) {
       return 0.0;
     }
@@ -208,7 +246,7 @@ class RecordingComparator {
     return previous[b.length] / math.max(a.length, b.length);
   }
 
-  List<TimeRange> _diffRanges(
+  static List<TimeRange> _diffRanges(
     List<double> userCurve,
     List<double> referenceCurve, {
     required int referenceDurationMs,
@@ -238,7 +276,7 @@ class RecordingComparator {
     return List.unmodifiable(ranges);
   }
 
-  TimeRange _bucketRange(
+  static TimeRange _bucketRange(
     int startBucket,
     int endBucket,
     int bucketCount,
@@ -252,7 +290,7 @@ class RecordingComparator {
     return TimeRange(startMs, endMs);
   }
 
-  double _score(double rhythmDelta, double intonationDelta) {
+  static double _score(double rhythmDelta, double intonationDelta) {
     final penalty = (rhythmDelta + intonationDelta).clamp(0.0, 1.0);
     return (1.0 - penalty) * 100.0;
   }

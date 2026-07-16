@@ -29,8 +29,23 @@ void main() {
     });
   });
 
-  test('ErrorCodes 與 backend-design §3.2.8 對應（17 碼抽查）', () {
+  test('ErrorCodes 與 backend-design §3.2.8 完整 26 碼集合一致', () {
+    expect(ErrorCodes.all, hasLength(26));
+    expect(ErrorCodes.all.toSet(), hasLength(26));
     expect(ErrorCodes.sidecarCrashed, 'ERR_SIDECAR_CRASHED');
     expect(ErrorCodes.archiveRestoreExpired, 'ERR_ARCHIVE_RESTORE_EXPIRED');
+    expect(ErrorCodes.languageUnsupported, 'ERR_LANGUAGE_UNSUPPORTED');
+    expect(ErrorCodes.labelCorrupted, 'ERR_LABEL_CORRUPTED');
+    expect(
+      ErrorCodes.labelFingerprintMismatch,
+      'ERR_LABEL_FINGERPRINT_MISMATCH',
+    );
+    expect(ErrorCodes.segmentTooClose, 'ERR_SEGMENT_TOO_CLOSE');
+    expect(ErrorCodes.boundaryTooClose, 'ERR_BOUNDARY_TOO_CLOSE');
+    expect(ErrorCodes.syllableMinCount, 'ERR_SYLLABLE_MIN_COUNT');
+    expect(
+      ErrorCodes.blockConfigOutOfRange,
+      'ERR_BLOCK_CONFIG_OUT_OF_RANGE',
+    );
   });
 }

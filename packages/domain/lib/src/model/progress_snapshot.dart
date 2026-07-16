@@ -1,5 +1,6 @@
 // AI-Generate
 import 'progress.dart';
+import 'settings.dart';
 
 /// `.aboprogress` 的平台中立快照（backend-design.md §3.2.6 介面 15/16）。
 ///
@@ -9,6 +10,9 @@ class ProgressSnapshot {
   final String profileId;
   final String courseId;
   final Map<String, String> lessonContentHashes;
+
+  /// 每 Lesson 顯示偏好；缺少 key 時由 [transcriptModeForLesson] 回傳 transcript。
+  final Map<String, TranscriptDisplayMode> transcriptDisplayModes;
   final List<PracticeGroup> groups;
   final List<SrsState> srsStates;
   final List<Attempt> attempts;
@@ -17,10 +21,12 @@ class ProgressSnapshot {
     required this.profileId,
     required this.courseId,
     required Map<String, String> lessonContentHashes,
+    Map<String, TranscriptDisplayMode> transcriptDisplayModes = const {},
     required List<PracticeGroup> groups,
     required List<SrsState> srsStates,
     required List<Attempt> attempts,
   })  : lessonContentHashes = Map.unmodifiable(lessonContentHashes),
+        transcriptDisplayModes = Map.unmodifiable(transcriptDisplayModes),
         groups = List.unmodifiable(groups),
         srsStates = List.unmodifiable(srsStates),
         attempts = List.unmodifiable(attempts) {
@@ -30,12 +36,28 @@ class ProgressSnapshot {
       _requireNotBlank(entry.key, 'ProgressSnapshot.lessonId');
       _requireNotBlank(entry.value, 'ProgressSnapshot.contentHash');
     }
+    for (final lessonId in transcriptDisplayModes.keys) {
+      _requireNotBlank(
+        lessonId,
+        'ProgressSnapshot.transcriptDisplayModes.lessonId',
+      );
+    }
+  }
+
+  /// 取得指定 Lesson 的顯示模式；未保存偏好沿用 transcript 預設。
+  TranscriptDisplayMode transcriptModeForLesson(String lessonId) {
+    _requireNotBlank(lessonId, 'ProgressSnapshot.lessonId');
+    return transcriptDisplayModes[lessonId] ?? TranscriptDisplayMode.transcript;
   }
 
   Map<String, dynamic> toJson() => {
         'profileId': profileId,
         'courseId': courseId,
         'lessonContentHashes': lessonContentHashes,
+        'transcriptDisplayModes': {
+          for (final entry in transcriptDisplayModes.entries)
+            entry.key: entry.value.value,
+        },
         'groups': groups.map(_practiceGroupToJson).toList(growable: false),
         'srsStates': srsStates.map(_srsStateToJson).toList(growable: false),
         'attempts': attempts.map(_attemptToJson).toList(growable: false),
@@ -46,6 +68,20 @@ class ProgressSnapshot {
     if (hashes is! Map<String, dynamic>) {
       throw const FormatException('lessonContentHashes missing');
     }
+    final rawModes = json['transcriptDisplayModes'];
+    final modes = <String, TranscriptDisplayMode>{};
+    if (rawModes != null) {
+      if (rawModes is! Map<String, dynamic>) {
+        throw const FormatException('transcriptDisplayModes invalid');
+      }
+      for (final entry in rawModes.entries) {
+        if (entry.value is! String) {
+          throw const FormatException('transcriptDisplayModes value invalid');
+        }
+        modes[entry.key] =
+            TranscriptDisplayMode.fromJson(entry.value as String);
+      }
+    }
 
     return ProgressSnapshot(
       profileId: json['profileId'] as String,
@@ -53,6 +89,7 @@ class ProgressSnapshot {
       lessonContentHashes: {
         for (final entry in hashes.entries) entry.key: entry.value as String,
       },
+      transcriptDisplayModes: modes,
       groups: (json['groups'] as List<dynamic>)
           .map((item) => _practiceGroupFromJson(item as Map<String, dynamic>))
           .toList(growable: false),

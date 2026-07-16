@@ -25,8 +25,10 @@ void main() {
 
       expect(restored.id, lesson.id);
       expect(restored.title, lesson.title);
+      expect(restored.language, 'en');
       expect(restored.words, lesson.words);
       expect(restored.syllables, lesson.syllables);
+      expect(restored.syllables.first.originalText, 'she-recognized');
       expect(restored.translations, lesson.translations);
       expect(restored.prosody, lesson.prosody);
       expect(restored.practiceConfig, lesson.practiceConfig);
@@ -37,10 +39,87 @@ void main() {
 
       final archive = _decodePack(fileIo.bytesAt('/tmp/she_has.abopack'));
       final manifest = _manifestJson(archive);
-      expect(manifest['schemaVersion'], 1);
+      expect(manifest['schemaVersion'], 2);
+      expect(manifest['lesson']['language'], 'en');
       expect(manifest['lesson']['contentHash'], restored.contentHash);
       expect(_entryBytes(archive, 'audio/original.wav'),
           lesson.originalAudioBytes);
+    });
+
+    test('AT-19-04 schemaVersion 2 round-trip 保存自訂排列與 stale 狀態', () async {
+      final fileIo = _MemoryFileIo();
+      final engine = LessonPackEngine(fileIo: fileIo);
+      final arrangement = PracticeEngine()
+          .generateArrangement(
+            _goldenLesson().syllables,
+            lessonId: 'lesson-she-has',
+            updatedAt: DateTime.utc(2026, 7, 13, 14),
+          )
+          .markStale(updatedAt: DateTime.utc(2026, 7, 13, 14, 1));
+      final lesson = _goldenLesson().copyWith(arrangement: arrangement);
+
+      await engine.write(lesson, '/tmp/arranged.abopack');
+      final restored = await engine.read('/tmp/arranged.abopack');
+
+      expect(restored.arrangement, isNotNull);
+      expect(restored.arrangement!.lessonId, 'lesson-she-has');
+      expect(restored.arrangement!.rows, hasLength(11));
+      expect(restored.arrangement!.staleFlag, isTrue);
+      expect(restored.arrangement!.rows.last.blocks, hasLength(11));
+      expect(restored.arrangement!.rows.last.blocks.last.repeatN, 1);
+      expect(restored.arrangement!.rows.last.blocks.last.silenceFactor, 1);
+      expect(restored.arrangement!.rows.last.repeatN, 3);
+      expect(restored.arrangement!.rows.last.silenceFactor, 1);
+      expect(restored.arrangement!.updatedAt, DateTime.utc(2026, 7, 13, 14, 1));
+
+      final manifest = _manifestJson(
+        _decodePack(fileIo.bytesAt('/tmp/arranged.abopack')),
+      );
+      expect(manifest['schemaVersion'], 2);
+      expect(manifest['lesson']['arrangement'], isA<Map<String, dynamic>>());
+    });
+
+    test('AT-15-11 舊 pack 的 silenceFactor=2.5 原值 round-trip', () async {
+      final fileIo = _MemoryFileIo();
+      final engine = LessonPackEngine(fileIo: fileIo);
+      final base = _goldenLesson();
+      final arrangement = PracticeArrangement(
+        lessonId: base.id,
+        rows: [
+          PracticeRow(
+            index: 1,
+            blocks: [
+              PracticeBlock(
+                syllables: [base.syllables.first],
+                silenceFactor: 2.5,
+              ),
+            ],
+          ),
+        ],
+        updatedAt: DateTime.utc(2026, 7, 14, 9),
+      );
+
+      await engine.write(
+        base.copyWith(arrangement: arrangement),
+        '/tmp/legacy-silence.abopack',
+      );
+      final restored = await engine.read('/tmp/legacy-silence.abopack');
+
+      expect(
+          restored.arrangement!.rows.single.blocks.single.silenceFactor, 2.5);
+    });
+
+    test('AT-15-13 舊排列缺 row config 時採現行預設 3／1', () {
+      final syllable = _goldenLesson().syllables.first;
+      final row = PracticeRow.fromJson({
+        'index': 1,
+        'blocks': [
+          PracticeBlock(syllables: [syllable]).toJson(),
+        ],
+      });
+
+      expect(row.repeatN, 3);
+      expect(row.silenceFactor, 1);
     });
 
     test('AT-07-05 pack 不含 key、secret、password 或絕對路徑', () async {
@@ -67,6 +146,39 @@ void main() {
       expect(packText, isNot(contains('/Users/')));
     });
 
+    test('AT-18-06 pack 不含 RecordingBuffer metadata、暫存檔名或 PCM 檔', () async {
+      final fileIo = _MemoryFileIo();
+      final engine = LessonPackEngine(fileIo: fileIo);
+
+      await engine.write(_goldenLesson(), '/tmp/no-recording-buffer.abopack');
+
+      final bytes = fileIo.bytesAt('/tmp/no-recording-buffer.abopack');
+      final archive = _decodePack(bytes);
+      final names = archive.files.map((file) => file.name).toList();
+      expect(names, unorderedEquals(['manifest.json', 'audio/original.wav']));
+      expect(
+        names.where((name) =>
+            name.endsWith('.pcm') ||
+            name.endsWith('.meta.json') ||
+            name.contains('recording_buffer') ||
+            name.contains('recording-')),
+        isEmpty,
+      );
+
+      final text = utf8.decode(bytes, allowMalformed: true).toLowerCase();
+      for (final marker in [
+        'recording_buffer',
+        'recording-',
+        '.meta.json',
+        'pcmpath',
+        'recordingpath',
+        'attemptcontext',
+      ]) {
+        expect(text, isNot(contains(marker)),
+            reason: 'pack 不得含暫存 marker=$marker');
+      }
+    });
+
     test('AT-07-03 損毀 zip 拋 ERR_PACK_CORRUPTED，不回傳部分 Lesson', () {
       final fileIo = _MemoryFileIo()
         ..store('/tmp/broken.abopack', Uint8List.fromList([1, 2, 3, 4]));
@@ -88,13 +200,29 @@ void main() {
         _domainError(ErrorCodes.packCorrupted),
       );
     });
+
+    test('AT-17-04 讀取無 language 的 v1 舊 pack 時補 en', () async {
+      final fileIo = _MemoryFileIo()
+        ..store('/tmp/legacy.abopack', _legacyPackWithoutLanguage());
+      final engine = LessonPackEngine(fileIo: fileIo);
+
+      final restored = await engine.read('/tmp/legacy.abopack');
+
+      expect(restored.language, 'en');
+    });
   });
 }
 
 Lesson _goldenLesson({String contentHash = ''}) {
   final syllables = [
     Syllable(
-        text: 'she', startMs: 0, endMs: 200, wordIndex: 0, needsReview: false),
+      text: 'she',
+      originalText: 'she-recognized',
+      startMs: 0,
+      endMs: 200,
+      wordIndex: 0,
+      needsReview: false,
+    ),
     Syllable(
         text: 'has',
         startMs: 200,
@@ -152,6 +280,7 @@ Lesson _goldenLesson({String contentHash = ''}) {
   return Lesson(
     id: 'lesson-she-has',
     title: 'She has excellent communication skills',
+    language: 'en',
     audioRelPath: 'audio/original.wav',
     originalAudioBytes: Uint8List.fromList(List.generate(32, (i) => i)),
     contentHash: contentHash,
@@ -214,6 +343,24 @@ Uint8List _packWithoutAudio() {
         'schemaVersion': 1,
         'lesson': lesson.toJson(),
       })),
+    ));
+  return Uint8List.fromList(ZipEncoder().encode(archive)!);
+}
+
+Uint8List _legacyPackWithoutLanguage() {
+  final lesson = _goldenLesson().withContentHash();
+  final lessonJson = lesson.toJson()..remove('language');
+  lessonJson.remove('arrangement');
+  final manifestBytes = utf8.encode(jsonEncode({
+    'schemaVersion': 1,
+    'lesson': lessonJson,
+  }));
+  final archive = Archive()
+    ..addFile(ArchiveFile('manifest.json', manifestBytes.length, manifestBytes))
+    ..addFile(ArchiveFile(
+      lesson.audioRelPath,
+      lesson.originalAudioBytes.length,
+      lesson.originalAudioBytes,
     ));
   return Uint8List.fromList(ZipEncoder().encode(archive)!);
 }
