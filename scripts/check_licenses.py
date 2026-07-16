@@ -71,6 +71,8 @@ def validate_manifest(manifest):
         name = str(component.get("name", "")).strip()
         license_id = str(component.get("license", "")).strip()
         distribution = str(component.get("distribution", "")).strip()
+        category = str(component.get("category", "")).strip().lower()
+        source = str(component.get("source", "")).strip()
         language = str(component.get("language", "")).strip().lower()
         linking = str(component.get("linking", "")).strip().lower()
         label = name or f"component #{index}"
@@ -81,6 +83,9 @@ def validate_manifest(manifest):
             errors.append(f"{label}：缺少 license")
         if not distribution:
             errors.append(f"{label}：缺少 distribution")
+
+        if category in {"sidecar", "sidecar-transitive", "model"} and not source:
+            errors.append(f"{label}：sidecar/model 必須有 source")
 
         if _is_banned_license(license_id):
             errors.append(f"{label}：禁止授權 {license_id}")

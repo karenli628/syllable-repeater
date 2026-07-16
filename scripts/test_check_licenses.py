@@ -75,6 +75,18 @@ class CheckLicensesTest(unittest.TestCase):
 
         self.assertEqual(["manifest.components 必須是非空陣列"], errors)
 
+    def test_requires_source_for_bundled_sidecar_or_model(self):
+        errors = validate_manifest(manifest_with({
+            "name": "new-asr-engine",
+            "category": "sidecar",
+            "license": "MIT",
+            "distribution": "bundled",
+            "language": "C/C++",
+            "linking": "n/a",
+        }))
+
+        self.assertIn("new-asr-engine：sidecar/model 必須有 source", errors)
+
 
 if __name__ == "__main__":
     unittest.main()

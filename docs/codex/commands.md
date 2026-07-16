@@ -58,6 +58,16 @@ python3 scripts/check_licenses.py "$MANIFEST"
 python3 -m unittest scripts/test_check_licenses.py scripts/test_prepare_release_sidecars.py
 ```
 
+### 新 ASR 引擎／模型上架五步（v1.1／guardrails #50）
+
+每個新增元件都要依序完成：①Domain port 相容的 adapter；②license manifest
+授權審查（sidecar artifact 另核 URL＋SHA-256＋授權）；③M4 timeout／crash
+故障注入；④金標準 11 音節／10 切點／11 步回歸與 benchmark；⑤註冊
+`TranscriberRegistry`／`SyllabifierRegistry` 並驗證未註冊語言 fail-closed。
+逐項證據與核可欄位見
+`spec-syllable-repeater/requirements/syllable-practice-macos-v1.1_20260712/release/release-checklist.md`。
+五步未完成前不得執行 release staging 或把元件放進 App bundle。
+
 ## 效能 benchmark（Q10）
 
 ```bash
