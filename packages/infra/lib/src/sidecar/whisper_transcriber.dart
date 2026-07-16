@@ -10,16 +10,9 @@ import 'sidecar_runner.dart';
 class WhisperJsonParser {
   const WhisperJsonParser();
 
+  /// 解析詞級時間戳（REQ-17、AT-17-05）。
   List<Word> parseWords(String jsonText) {
-    final decoded = jsonDecode(jsonText);
-    if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('whisper JSON root must be an object');
-    }
-
-    final transcription = decoded['transcription'];
-    if (transcription is! List<dynamic>) {
-      throw const FormatException('whisper JSON transcription must be a list');
-    }
+    final transcription = _parseTranscription(jsonText);
 
     final words = <Word>[];
     _PendingWord? current;
@@ -73,6 +66,60 @@ class WhisperJsonParser {
     return words;
   }
 
+  /// 解析 whisper full JSON 既有的句子級 offsets（REQ-11、AT-17-05）。
+  List<Segment> parseSegments(
+    String jsonText, {
+    required String language,
+  }) {
+    final normalizedLanguage = language.trim().toLowerCase();
+    if (normalizedLanguage.isEmpty) {
+      throw ArgumentError('language 不可空白（got "$language"）');
+    }
+    final transcription = _parseTranscription(jsonText);
+    final segments = <Segment>[];
+    for (final rawSegment in transcription) {
+      if (rawSegment is! Map<String, dynamic>) {
+        continue;
+      }
+      final text = rawSegment['text'];
+      final offsets = rawSegment['offsets'];
+      if (text is! String ||
+          text.trim().isEmpty ||
+          offsets is! Map<String, dynamic>) {
+        continue;
+      }
+      final from = offsets['from'];
+      final to = offsets['to'];
+      if (from is! int || to is! int || from < 0 || to <= from) {
+        continue;
+      }
+      final rawConfidence = rawSegment['confidence'];
+      final confidence =
+          rawConfidence is num ? rawConfidence.toDouble().clamp(0.0, 1.0) : 0.0;
+      segments.add(Segment(
+        id: 'segment-${segments.length + 1}',
+        startMs: from,
+        endMs: to,
+        text: text.trim(),
+        language: normalizedLanguage,
+        confidence: confidence,
+      ));
+    }
+    return List.unmodifiable(segments);
+  }
+
+  List<dynamic> _parseTranscription(String jsonText) {
+    final decoded = jsonDecode(jsonText);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('whisper JSON root must be an object');
+    }
+    final transcription = decoded['transcription'];
+    if (transcription is! List<dynamic>) {
+      throw const FormatException('whisper JSON transcription must be a list');
+    }
+    return transcription;
+  }
+
   String _lettersOnly(String tokenText) =>
       tokenText.toLowerCase().replaceAll(RegExp('[^a-z]'), '');
 }
@@ -99,6 +146,33 @@ class WhisperCppTranscriber {
     String audioPath, {
     required String outputBasePath,
     String language = 'en',
+  }) async {
+    final jsonText = await _runAndReadJson(
+      audioPath,
+      outputBasePath: outputBasePath,
+      language: language,
+    );
+    return parser.parseWords(jsonText);
+  }
+
+  /// 執行本地 whisper.cpp 並回傳句子級時間戳（REQ-11、AT-17-05）。
+  Future<List<Segment>> segment(
+    String audioPath, {
+    required String outputBasePath,
+    String language = 'en',
+  }) async {
+    final jsonText = await _runAndReadJson(
+      audioPath,
+      outputBasePath: outputBasePath,
+      language: language,
+    );
+    return parser.parseSegments(jsonText, language: language);
+  }
+
+  Future<String> _runAndReadJson(
+    String audioPath, {
+    required String outputBasePath,
+    required String language,
   }) async {
     final args = [
       '-m',
@@ -141,7 +215,7 @@ class WhisperCppTranscriber {
       throw const DomainException(
           ErrorCodes.transcribeFailed, '辨識失敗：未產生 JSON 結果');
     }
-    return parser.parseWords(jsonFile.readAsStringSync());
+    return jsonFile.readAsStringSync();
   }
 }
 

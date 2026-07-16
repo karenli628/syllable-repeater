@@ -4,8 +4,9 @@ import 'package:drift/native.dart';
 
 part 'app_database.g.dart';
 
-/// Drift schema V1（task-split 1.2；backend-design §3.1.2；OQ-3 已由使用者核可）。
-/// 等效 SQL 見 packages/infra/lib/db/schema/V1__create_all.sql。
+/// Drift schema（task-split 1.2、3.5；backend-design §3.1.2；OQ-3/OQ-6）。
+/// 等效 SQL 見 packages/infra/lib/db/schema/V1__create_all.sql 與
+/// V3__v11_label_registry.sql。
 /// 時間欄位一律 epoch ms（UTC）之 INTEGER。
 
 /// 課件註冊表：pack 位置與 content hash（M6 局部重置依據）。
@@ -116,6 +117,21 @@ class AuditLogs extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// 最近標籤檔索引（v1.1 backend-design.md §3.1.1、REQ-11、OQ-6）。
+/// M10 結構防線：只保存索引資訊，結構上不提供音訊或錄音欄位。
+class LabelRegistry extends Table {
+  TextColumn get audioFingerprint => text()();
+  TextColumn get labelPath => text()();
+  IntColumn get segmentCount => integer()();
+  IntColumn get updatedAt => integer()();
+
+  @override
+  String get tableName => 'label_registry';
+
+  @override
+  Set<Column<Object>> get primaryKey => {audioFingerprint};
+}
+
 @DriftDatabase(
   tables: [
     LessonRegistry,
@@ -124,19 +140,23 @@ class AuditLogs extends Table {
     Attempts,
     AppSettings,
     AuditLogs,
+    LabelRegistry,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.createTable(auditLogs);
+          }
+          if (from < 3) {
+            await m.createTable(labelRegistry);
           }
         },
       );

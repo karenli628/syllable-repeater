@@ -7,6 +7,10 @@ import 'package:path/path.dart' as p;
 
 const _benchmarkSeconds = 10;
 const _target = Duration(seconds: 60);
+// v1 Q10 基準（2026-07-07，Intel i5-8259U）：4.689 秒。
+const _v1BaselineElapsedMs = 4689;
+const _maxRegressionRatio = 1.05;
+const _v11RegressionLimitMs = 4924;
 const _sourceAudioName = 'step up your coding skills to a new level.mp3';
 
 Future<void> main() async {
@@ -17,6 +21,12 @@ Future<void> main() async {
     stdout.writeln('audioDurationMs: ${report.audioDurationMs}');
     stdout.writeln('elapsedMs: ${report.elapsedMs}');
     stdout.writeln('elapsedSeconds: ${report.elapsedSeconds}');
+    stdout.writeln('v1BaselineElapsedMs: $_v1BaselineElapsedMs');
+    stdout.writeln('v1BaselineElapsedSeconds: ${_v1BaselineElapsedMs / 1000}');
+    stdout.writeln('maxRegressionRatio: $_maxRegressionRatio');
+    stdout.writeln('v11RegressionLimitMs: $_v11RegressionLimitMs');
+    stdout.writeln(
+        'rerunCommand: dart run bin/benchmark_alignment_pipeline.dart');
     stdout.writeln('syllableCount: ${report.syllableCount}');
     stdout.writeln('waveformPeaks: ${report.waveformPeakCount}');
     stdout.writeln('targetSeconds: ${_target.inSeconds}');
@@ -71,25 +81,30 @@ Future<_BenchmarkReport> _runBenchmark() async {
   );
 
   final runner = const SidecarRunner(defaultTimeout: Duration(seconds: 180));
+  final transcriber = WhisperAnalysisTranscriber(
+    audioPreparer: FfmpegTranscriptionAudioPreparer(
+      runner: runner,
+      ffmpegPath: ffmpeg.path,
+      tempDirectory: tempDir.path,
+    ),
+    transcriber: WhisperCppTranscriber(
+      runner: runner,
+      whisperCliPath: whisperCli.path,
+      modelPath: model.path,
+      noGpu: true,
+    ),
+    outputDirectory: tempDir.path,
+  );
   final pipeline = AnalysisPipeline(
     decoder: FfmpegDecoder(runner: runner, ffmpegPath: ffmpeg.path),
-    transcriber: WhisperAnalysisTranscriber(
-      audioPreparer: FfmpegTranscriptionAudioPreparer(
-        runner: runner,
-        ffmpegPath: ffmpeg.path,
-        tempDirectory: tempDir.path,
+    transcriberRegistry: TranscriberRegistry([transcriber]),
+    syllabifierRegistry: SyllabifierRegistry([
+      EnglishSyllabifier(
+        alignmentEngine: AlignmentEngine(
+          dictionary: const CmuDictLoader().load(cmudict.path),
+        ),
       ),
-      transcriber: WhisperCppTranscriber(
-        runner: runner,
-        whisperCliPath: whisperCli.path,
-        modelPath: model.path,
-        noGpu: true,
-      ),
-      outputDirectory: tempDir.path,
-    ),
-    alignmentEngine: AlignmentEngine(
-      dictionary: const CmuDictLoader().load(cmudict.path),
-    ),
+    ]),
   );
 
   AnalysisEvent? done;
@@ -205,5 +220,7 @@ class _BenchmarkReport {
   });
 
   String get elapsedSeconds => (elapsedMs / 1000).toStringAsFixed(3);
-  bool get passed => Duration(milliseconds: elapsedMs) <= _target;
+  bool get passed =>
+      Duration(milliseconds: elapsedMs) <= _target &&
+      elapsedMs <= _v11RegressionLimitMs;
 }

@@ -37,8 +37,8 @@ void main() {
       );
 
       final words = await adapter.transcribe(
-        ImportRequest(audioPath: '/tmp/step up.mp3'),
-        decodedPcm: Pcm(Int16List(44100 * 3)),
+        Pcm(Int16List(44100 * 3)),
+        language: 'en',
       );
 
       expect(words.map((w) => w.text), [
@@ -65,6 +65,46 @@ void main() {
         containsAllInOrder(['-f', runner.calls[0].args.last, '-l', 'en']),
       );
       expect(runner.calls[1].args, contains('--no-gpu'));
+      expect(dir.listSync(), isEmpty,
+          reason: '16k WAV 與 whisper JSON 皆須 finally 清除');
+    });
+
+    test('AT-17-05：同一 adapter 可回傳 segment 級時間戳', () async {
+      final dir = await Directory.systemTemp.createTemp('segment-adapter-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final runner = _ScriptedRunner((executable, args) async {
+        if (executable == 'whisper-cli') {
+          final outputBase = args[args.indexOf('-of') + 1];
+          File('$outputBase.json').writeAsStringSync(_stepUpJson);
+        }
+        return const SidecarResult(0, [], '');
+      });
+      final adapter = WhisperAnalysisTranscriber(
+        audioPreparer: FfmpegTranscriptionAudioPreparer(
+          runner: runner,
+          ffmpegPath: 'ffmpeg',
+          tempDirectory: dir.path,
+          verifyOutputExists: false,
+        ),
+        transcriber: WhisperCppTranscriber(
+          runner: runner,
+          whisperCliPath: 'whisper-cli',
+          modelPath: 'ggml-small.en.bin',
+          noGpu: true,
+        ),
+        outputDirectory: dir.path,
+      );
+
+      final segments = await adapter.segment(
+        Pcm(Int16List(44100 * 3)),
+        language: 'en',
+      );
+
+      expect(segments, hasLength(1));
+      expect(segments.single.startMs, 80);
+      expect(segments.single.endMs, 3120);
+      expect(segments.single.language, 'en');
+      expect(dir.listSync(), isEmpty, reason: 'segment 作業中介檔不得留在 session');
     });
 
     test('辨識用 WAV 準備逾時映射 ERR_SIDECAR_TIMEOUT', () async {
@@ -114,6 +154,9 @@ Matcher _domainError(String code) =>
 final String _stepUpJson = jsonEncode({
   'transcription': [
     {
+      'offsets': {'from': 80, 'to': 3120},
+      'text': ' Step up your coding skills to a new level.',
+      'confidence': 0.91,
       'tokens': [
         _token('[_BEG_]', 0, 0),
         _token(' Step', 80, 350),

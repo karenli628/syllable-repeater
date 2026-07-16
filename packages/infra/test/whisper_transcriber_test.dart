@@ -44,6 +44,22 @@ void main() {
       expect(words.last.startMs, 2520);
       expect(words.last.endMs, 3000);
     });
+
+    test('AT-17-05：解析既有 JSON segment offsets 與語言標記', () {
+      final segments = const WhisperJsonParser().parseSegments(
+        _stepUpJson,
+        language: 'en',
+      );
+
+      expect(segments, hasLength(1));
+      expect(segments.single.id, 'segment-1');
+      expect(segments.single.startMs, 80);
+      expect(segments.single.endMs, 3120);
+      expect(
+          segments.single.text, 'Step up your coding skills to a new level.');
+      expect(segments.single.language, 'en');
+      expect(segments.single.confidence, 0.91);
+    });
   });
 
   group('WhisperCppTranscriber', () {
@@ -79,6 +95,29 @@ void main() {
             outputBase,
             '--no-gpu',
           ]));
+    });
+
+    test('AT-17-05：segment() 讀回句子級 offsets', () async {
+      final dir = await Directory.systemTemp.createTemp('whisper-segment-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final outputBase = '${dir.path}/segments';
+      final fake = _FakeRunner((args) async {
+        File('$outputBase.json').writeAsStringSync(_stepUpJson);
+        return const SidecarResult(0, [], '');
+      });
+      final transcriber = WhisperCppTranscriber(
+        runner: fake,
+        whisperCliPath: 'whisper-cli',
+        modelPath: 'ggml-small.en.bin',
+      );
+
+      final segments = await transcriber.segment(
+        '/tmp/audio.wav',
+        outputBasePath: outputBase,
+      );
+
+      expect(segments.single.range.startMs, 80);
+      expect(segments.single.range.endMs, 3120);
     });
 
     test('逾時映射 ERR_SIDECAR_TIMEOUT', () async {
@@ -135,6 +174,9 @@ void main() {
 final String _stepUpJson = jsonEncode({
   'transcription': [
     {
+      'offsets': {'from': 80, 'to': 3120},
+      'text': ' Step up your coding skills to a new level.',
+      'confidence': 0.91,
       'tokens': [
         _token('[_BEG_]', 0, 0),
         _token(' Step', 80, 350),

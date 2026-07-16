@@ -40,6 +40,28 @@ class _FakeDecoder implements AnalysisAudioDecoder {
   }
 }
 
+class _FakePreparer implements DemucsAudioPreparer {
+  _FakePreparer({this.error});
+
+  final DomainException? error;
+  int calls = 0;
+  String? lastSourcePath;
+  String? lastDestinationPath;
+
+  @override
+  Future<void> prepare(
+    ImportRequest request,
+    String destinationPath,
+  ) async {
+    calls++;
+    lastSourcePath = request.audioPath;
+    lastDestinationPath = destinationPath;
+    if (error != null) throw error!;
+    await Directory(p.dirname(destinationPath)).create(recursive: true);
+    await File(destinationPath).writeAsBytes(encodeWav(_silentPcm()));
+  }
+}
+
 Matcher _domainError(String code) =>
     throwsA(isA<DomainException>().having((e) => e.code, 'code', code));
 
@@ -47,10 +69,12 @@ DemucsCppVocalSeparator _separator(
   _FakeRunner runner, {
   required String outDir,
   AnalysisAudioDecoder? decoder,
+  DemucsAudioPreparer? preparer,
 }) {
   return DemucsCppVocalSeparator(
     runner: runner,
     decoder: decoder ?? _FakeDecoder(Pcm(Int16List(44100))),
+    inputPreparer: preparer ?? _FakePreparer(),
     demucsCliPath: '/dev/null/demucs.cpp.main',
     modelPath: '/dev/null/ggml-model-htdemucs-4s-f16.bin',
     outputDirectory: outDir,
@@ -73,19 +97,41 @@ void main() {
     if (tmp.existsSync()) tmp.deleteSync(recursive: true);
   });
 
+  test('AT-18-10 Demucs 前保留原始聲道數，只轉 44.1kHz PCM', () async {
+    final fake = _FakeRunner(() async => const SidecarResult(0, [], ''));
+    final preparer = FfmpegDemucsAudioPreparer(
+      runner: fake,
+      ffmpegPath: '/bundle/ffmpeg',
+      verifyOutputExists: false,
+    );
+    final destination = p.join(tmp.path, 'input_44100.wav');
+
+    await preparer.prepare(_req(), destination);
+
+    expect(fake.capturedExe, '/bundle/ffmpeg');
+    expect(fake.capturedArgs, containsAllInOrder(['-i', '/tmp/song.mp3']));
+    expect(fake.capturedArgs, containsAllInOrder(['-ar', '44100']));
+    expect(fake.capturedArgs, isNot(contains('-ac')));
+    expect(fake.capturedArgs!.last, destination);
+  });
+
   group('DemucsCppVocalSeparator 錯誤映射', () {
-    test('decodedPcm 非 44100Hz → ERR_SEPARATE_FAILED 且不啟動 sidecar', () async {
+    test('雙聲道輸入準備失敗 → ERR_SEPARATE_FAILED 且不啟動 demucs', () async {
       final fake = _FakeRunner(() async => SidecarResult(0, [], ''));
-      final sep = _separator(fake, outDir: tmp.path);
+      final preparer = _FakePreparer(
+        error: const DomainException(
+          ErrorCodes.separateFailed,
+          'prepare failed',
+        ),
+      );
+      final sep = _separator(fake, outDir: tmp.path, preparer: preparer);
 
       await expectLater(
-        sep.separate(
-          _req(),
-          decodedPcm: Pcm(Int16List(16000), sampleRate: 16000),
-        ),
+        sep.separate(_req(), decodedPcm: _silentPcm()),
         _domainError(ErrorCodes.separateFailed),
       );
 
+      expect(preparer.calls, 1);
       expect(fake.capturedArgs, isNull);
     });
 
@@ -161,10 +207,14 @@ void main() {
       // 驗證 CLI args 對齊 sevagh/demucs.cpp README。
       expect(fake.capturedArgs![0], '/dev/null/ggml-model-htdemucs-4s-f16.bin');
       expect(
-          fake.capturedArgs![1], p.join(knownWorkDir!, 'input_44100_mono.wav'));
+        fake.capturedArgs![1],
+        p.join(knownWorkDir!, 'input_44100.wav'),
+      );
       expect(fake.capturedArgs![2], knownWorkDir);
       expect(File(fake.capturedArgs![1]).existsSync(), isFalse,
           reason: 'demucs 行程結束後應清除暫存輸入 WAV');
+      expect(Directory(knownWorkDir!).existsSync(), isFalse,
+          reason: '解碼 vocals 後應連同 drums/bass/other/vocals 清除整個作業目錄');
     });
 
     test('workDir 建於 outputDirectory 下、名稱含 audioPath basename', () async {

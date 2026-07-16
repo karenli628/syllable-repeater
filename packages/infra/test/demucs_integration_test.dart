@@ -61,6 +61,10 @@ void main() {
     final separator = DemucsCppVocalSeparator(
       runner: runner,
       decoder: decoder,
+      inputPreparer: FfmpegDemucsAudioPreparer(
+        runner: runner,
+        ffmpegPath: ffmpeg.path,
+      ),
       demucsCliPath: demucsCli.path,
       modelPath: modelPath.path,
       outputDirectory: workRoot.path,
@@ -75,7 +79,8 @@ void main() {
     final result = await separator.separate(request, decodedPcm: decodedPcm);
 
     expect(result.audioPath, endsWith('target_3_vocals.wav'));
-    expect(File(result.audioPath).existsSync(), isTrue);
+    expect(File(result.audioPath).existsSync(), isFalse,
+        reason: 'AT-10-07：PCM 讀回後即刪除 Demucs 中介檔');
     expect(result.pcm.samples, isNotEmpty);
     expect(result.pcm.sampleRate, 44100);
     expect(result.pcm.durationMs, greaterThan(1000),

@@ -3,12 +3,16 @@
 library;
 
 export 'src/analysis/analysis_pipeline_adapters.dart';
+export 'src/analysis/dart_io_audio_import_reader.dart';
 export 'src/analysis/file_waveform_peaks_cache.dart';
 export 'src/alignment/cmudict_loader.dart';
 export 'src/clock_impl.dart';
 export 'src/db/app_database.dart';
+export 'src/db/drift_label_registry_repository.dart';
 export 'src/db/drift_progress_repository.dart';
+export 'src/db/drift_settings_service.dart';
 export 'src/file_io_impl.dart';
+export 'src/managed_temp_session.dart';
 export 'src/practice/practice_exporter.dart';
 export 'src/practice/recording_audio_source.dart';
 export 'src/sidecar/demucs_separator.dart';

@@ -57,6 +57,48 @@ class PracticeExporter {
     return _writeMp3(audio, destPath);
   }
 
+  /// 依 M12 單元型別匯出，模式判定結果由 Domain 提供（REQ-16）。
+  Future<PracticeExportResult> exportUnit(
+    PracticeUnit unit,
+    Pcm originalPcm,
+    String destPath, {
+    PracticeUnitExportConfig? override,
+  }) async {
+    final effective = PracticeUnits(
+      mode: switch (unit) {
+        AutoPracticeUnit() => PracticeMode.auto,
+        WholeSentencePracticeUnit() => PracticeMode.wholeSentence,
+        CustomPracticeUnit() => PracticeMode.custom,
+      },
+      units: [unit],
+      stale: false,
+    );
+    final audio = await engine.renderUnitsExport(
+      effective,
+      originalPcm,
+      overrides: override == null ? const {} : {unit.index: override},
+    );
+    return _writeMp3(audio, destPath);
+  }
+
+  /// 匯出同一個 [PracticeUnits] 快照中的多個單元（REQ-16/M3 雙軌）。
+  Future<PracticeExportResult> exportUnits(
+    PracticeUnits effective,
+    Pcm originalPcm,
+    String destPath, {
+    Map<int, PracticeUnitExportConfig> overrides = const {},
+  }) async {
+    if (effective.units.isEmpty) {
+      throw ArgumentError('export units 不可為空');
+    }
+    final audio = await engine.renderUnitsExport(
+      effective,
+      originalPcm,
+      overrides: overrides,
+    );
+    return _writeMp3(audio, destPath);
+  }
+
   Future<PracticeExportResult> _writeMp3(
     PracticeExportAudio audio,
     String destPath,
@@ -70,6 +112,9 @@ class PracticeExporter {
       final mp3Bytes = await _encodeMp3(audio.pcm);
       try {
         await fileIo.writeBytesAtomic(destPath, mp3Bytes);
+        if (!await fileIo.exists(destPath)) {
+          throw StateError('written file is missing');
+        }
       } catch (_) {
         throw const DomainException(
           ErrorCodes.exportDestUnwritable,

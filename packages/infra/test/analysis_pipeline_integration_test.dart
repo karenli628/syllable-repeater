@@ -105,25 +105,30 @@ AnalysisPipeline? _createLocalPipeline(File audio) {
   ));
   tempDir.createSync(recursive: true);
   final runner = const SidecarRunner(defaultTimeout: Duration(seconds: 120));
+  final transcriber = WhisperAnalysisTranscriber(
+    audioPreparer: FfmpegTranscriptionAudioPreparer(
+      runner: runner,
+      ffmpegPath: ffmpeg.path,
+      tempDirectory: tempDir.path,
+    ),
+    transcriber: WhisperCppTranscriber(
+      runner: runner,
+      whisperCliPath: whisperCli.path,
+      modelPath: model.path,
+      noGpu: true,
+    ),
+    outputDirectory: tempDir.path,
+  );
   return AnalysisPipeline(
     decoder: FfmpegDecoder(runner: runner, ffmpegPath: ffmpeg.path),
-    transcriber: WhisperAnalysisTranscriber(
-      audioPreparer: FfmpegTranscriptionAudioPreparer(
-        runner: runner,
-        ffmpegPath: ffmpeg.path,
-        tempDirectory: tempDir.path,
+    transcriberRegistry: TranscriberRegistry([transcriber]),
+    syllabifierRegistry: SyllabifierRegistry([
+      EnglishSyllabifier(
+        alignmentEngine: AlignmentEngine(
+          dictionary: const CmuDictLoader().load(cmudict.path),
+        ),
       ),
-      transcriber: WhisperCppTranscriber(
-        runner: runner,
-        whisperCliPath: whisperCli.path,
-        modelPath: model.path,
-        noGpu: true,
-      ),
-      outputDirectory: tempDir.path,
-    ),
-    alignmentEngine: AlignmentEngine(
-      dictionary: const CmuDictLoader().load(cmudict.path),
-    ),
+    ]),
   );
 }
 

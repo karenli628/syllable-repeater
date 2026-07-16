@@ -2,8 +2,11 @@
 // Drift schema V1 結構測試（task-split 1.2）：
 // 表齊備、attempt 表結構上無音訊欄位（CT-10 結構防線）、
 // practice_group 無逾期/失敗欄位（M7 結構防線）。
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:infra/infra.dart';
+import 'package:sqlite3/sqlite3.dart' as raw_sqlite;
 import 'package:test/test.dart';
 
 void main() {
@@ -28,7 +31,8 @@ void main() {
     return rows.map((r) => r.read<String>('name')).toList();
   }
 
-  test('六張表齊備且表名與設計一致（backend-design §3.1.2 / #22）', () async {
+  // AT-11-03：V3 必須建立 label_registry，且不移除任何既有表。
+  test('七張表齊備且表名與設計一致（backend-design §3.1.2 / #22）', () async {
     final names = await tableNames();
     expect(
         names,
@@ -39,7 +43,102 @@ void main() {
           'attempt',
           'app_settings',
           'audit_log',
+          'label_registry',
         ]));
+  });
+
+  // AT-11-03／M10：label_registry 僅能保存索引，不得保存音訊或錄音。
+  test('label_registry 固定四欄且無音訊／錄音欄位（#43/#49）', () async {
+    final cols = await columnsOf('label_registry');
+    expect(
+      cols,
+      unorderedEquals([
+        'audio_fingerprint',
+        'label_path',
+        'segment_count',
+        'updated_at',
+      ]),
+      reason: '標籤索引只存指紋、路徑、段落數與時間，不得保存音訊內容',
+    );
+    for (final column in cols) {
+      expect(column.toLowerCase(), isNot(contains('audio_bytes')));
+      expect(column.toLowerCase(), isNot(contains('recording')));
+      expect(column.toLowerCase(), isNot(contains('pcm')));
+      expect(column.toLowerCase(), isNot(contains('blob')));
+    }
+  });
+
+  test('所有持久表均沒有 RecordingBuffer 表或錄音／PCM 欄位（M10/#43）', () async {
+    final names = await tableNames();
+    expect(
+      names.where((name) => name.toLowerCase().contains('recording')),
+      isEmpty,
+      reason: 'RecordingBuffer 只能存在 OS temp，不得建立 Drift 持久表',
+    );
+
+    const forbiddenFragments = [
+      'recording',
+      'pcm',
+      'audio_bytes',
+      'audio_blob',
+      'audio_path',
+      'recording_path',
+      'pcm_path',
+    ];
+    for (final table in names) {
+      final columns = await columnsOf(table);
+      for (final column in columns) {
+        final lower = column.toLowerCase();
+        expect(
+          forbiddenFragments.any(lower.contains),
+          isFalse,
+          reason: '$table.$column 不得持久化錄音或 PCM',
+        );
+      }
+    }
+  });
+
+  // AT-11-03：V2→V3 migration 必須建立新表並保留既有 audit_log 資料。
+  test('V2 升級 V3 建立 label_registry 且不破壞既有資料', () async {
+    await db.close();
+    final dir = await Directory.systemTemp.createTemp('db-v2-v3-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/migration.sqlite');
+    final raw = raw_sqlite.sqlite3.open(file.path);
+    raw.execute('''
+      CREATE TABLE audit_log (
+        id TEXT PRIMARY KEY,
+        occurred_at INTEGER NOT NULL,
+        actor TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT,
+        metadata_json TEXT NOT NULL
+      )
+    ''');
+    raw.execute('''
+      INSERT INTO audit_log
+        (id, occurred_at, actor, action, target_type, target_id, metadata_json)
+      VALUES
+        ('audit-before-v3', 1, 'local-user', 'fixture', 'test', NULL, '{}')
+    ''');
+    raw.execute('PRAGMA user_version = 2');
+    raw.dispose();
+
+    final migrated = AppDatabase(NativeDatabase(file));
+    addTearDown(migrated.close);
+    final tables = await migrated
+        .customSelect("SELECT name FROM sqlite_master WHERE type='table'")
+        .get();
+    expect(
+      tables.map((row) => row.read<String>('name')),
+      contains('label_registry'),
+    );
+    final preserved = await migrated
+        .customSelect("SELECT id FROM audit_log WHERE id='audit-before-v3'")
+        .getSingle();
+    expect(preserved.read<String>('id'), 'audit-before-v3');
+    expect(migrated.schemaVersion, 3);
   });
 
   test('attempt 表結構上不存在音訊欄位（M10/CT-10 結構防線）', () async {

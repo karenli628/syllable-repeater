@@ -2094,6 +2094,290 @@ class AuditLogsCompanion extends UpdateCompanion<AuditLog> {
   }
 }
 
+class $LabelRegistryTable extends LabelRegistry
+    with TableInfo<$LabelRegistryTable, LabelRegistryData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LabelRegistryTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _audioFingerprintMeta =
+      const VerificationMeta('audioFingerprint');
+  @override
+  late final GeneratedColumn<String> audioFingerprint = GeneratedColumn<String>(
+      'audio_fingerprint', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _labelPathMeta =
+      const VerificationMeta('labelPath');
+  @override
+  late final GeneratedColumn<String> labelPath = GeneratedColumn<String>(
+      'label_path', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _segmentCountMeta =
+      const VerificationMeta('segmentCount');
+  @override
+  late final GeneratedColumn<int> segmentCount = GeneratedColumn<int>(
+      'segment_count', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [audioFingerprint, labelPath, segmentCount, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'label_registry';
+  @override
+  VerificationContext validateIntegrity(Insertable<LabelRegistryData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('audio_fingerprint')) {
+      context.handle(
+          _audioFingerprintMeta,
+          audioFingerprint.isAcceptableOrUnknown(
+              data['audio_fingerprint']!, _audioFingerprintMeta));
+    } else if (isInserting) {
+      context.missing(_audioFingerprintMeta);
+    }
+    if (data.containsKey('label_path')) {
+      context.handle(_labelPathMeta,
+          labelPath.isAcceptableOrUnknown(data['label_path']!, _labelPathMeta));
+    } else if (isInserting) {
+      context.missing(_labelPathMeta);
+    }
+    if (data.containsKey('segment_count')) {
+      context.handle(
+          _segmentCountMeta,
+          segmentCount.isAcceptableOrUnknown(
+              data['segment_count']!, _segmentCountMeta));
+    } else if (isInserting) {
+      context.missing(_segmentCountMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {audioFingerprint};
+  @override
+  LabelRegistryData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LabelRegistryData(
+      audioFingerprint: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}audio_fingerprint'])!,
+      labelPath: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}label_path'])!,
+      segmentCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}segment_count'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $LabelRegistryTable createAlias(String alias) {
+    return $LabelRegistryTable(attachedDatabase, alias);
+  }
+}
+
+class LabelRegistryData extends DataClass
+    implements Insertable<LabelRegistryData> {
+  final String audioFingerprint;
+  final String labelPath;
+  final int segmentCount;
+  final int updatedAt;
+  const LabelRegistryData(
+      {required this.audioFingerprint,
+      required this.labelPath,
+      required this.segmentCount,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['audio_fingerprint'] = Variable<String>(audioFingerprint);
+    map['label_path'] = Variable<String>(labelPath);
+    map['segment_count'] = Variable<int>(segmentCount);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  LabelRegistryCompanion toCompanion(bool nullToAbsent) {
+    return LabelRegistryCompanion(
+      audioFingerprint: Value(audioFingerprint),
+      labelPath: Value(labelPath),
+      segmentCount: Value(segmentCount),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LabelRegistryData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LabelRegistryData(
+      audioFingerprint: serializer.fromJson<String>(json['audioFingerprint']),
+      labelPath: serializer.fromJson<String>(json['labelPath']),
+      segmentCount: serializer.fromJson<int>(json['segmentCount']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'audioFingerprint': serializer.toJson<String>(audioFingerprint),
+      'labelPath': serializer.toJson<String>(labelPath),
+      'segmentCount': serializer.toJson<int>(segmentCount),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  LabelRegistryData copyWith(
+          {String? audioFingerprint,
+          String? labelPath,
+          int? segmentCount,
+          int? updatedAt}) =>
+      LabelRegistryData(
+        audioFingerprint: audioFingerprint ?? this.audioFingerprint,
+        labelPath: labelPath ?? this.labelPath,
+        segmentCount: segmentCount ?? this.segmentCount,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  LabelRegistryData copyWithCompanion(LabelRegistryCompanion data) {
+    return LabelRegistryData(
+      audioFingerprint: data.audioFingerprint.present
+          ? data.audioFingerprint.value
+          : this.audioFingerprint,
+      labelPath: data.labelPath.present ? data.labelPath.value : this.labelPath,
+      segmentCount: data.segmentCount.present
+          ? data.segmentCount.value
+          : this.segmentCount,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LabelRegistryData(')
+          ..write('audioFingerprint: $audioFingerprint, ')
+          ..write('labelPath: $labelPath, ')
+          ..write('segmentCount: $segmentCount, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(audioFingerprint, labelPath, segmentCount, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LabelRegistryData &&
+          other.audioFingerprint == this.audioFingerprint &&
+          other.labelPath == this.labelPath &&
+          other.segmentCount == this.segmentCount &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LabelRegistryCompanion extends UpdateCompanion<LabelRegistryData> {
+  final Value<String> audioFingerprint;
+  final Value<String> labelPath;
+  final Value<int> segmentCount;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const LabelRegistryCompanion({
+    this.audioFingerprint = const Value.absent(),
+    this.labelPath = const Value.absent(),
+    this.segmentCount = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LabelRegistryCompanion.insert({
+    required String audioFingerprint,
+    required String labelPath,
+    required int segmentCount,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  })  : audioFingerprint = Value(audioFingerprint),
+        labelPath = Value(labelPath),
+        segmentCount = Value(segmentCount),
+        updatedAt = Value(updatedAt);
+  static Insertable<LabelRegistryData> custom({
+    Expression<String>? audioFingerprint,
+    Expression<String>? labelPath,
+    Expression<int>? segmentCount,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (audioFingerprint != null) 'audio_fingerprint': audioFingerprint,
+      if (labelPath != null) 'label_path': labelPath,
+      if (segmentCount != null) 'segment_count': segmentCount,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LabelRegistryCompanion copyWith(
+      {Value<String>? audioFingerprint,
+      Value<String>? labelPath,
+      Value<int>? segmentCount,
+      Value<int>? updatedAt,
+      Value<int>? rowid}) {
+    return LabelRegistryCompanion(
+      audioFingerprint: audioFingerprint ?? this.audioFingerprint,
+      labelPath: labelPath ?? this.labelPath,
+      segmentCount: segmentCount ?? this.segmentCount,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (audioFingerprint.present) {
+      map['audio_fingerprint'] = Variable<String>(audioFingerprint.value);
+    }
+    if (labelPath.present) {
+      map['label_path'] = Variable<String>(labelPath.value);
+    }
+    if (segmentCount.present) {
+      map['segment_count'] = Variable<int>(segmentCount.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LabelRegistryCompanion(')
+          ..write('audioFingerprint: $audioFingerprint, ')
+          ..write('labelPath: $labelPath, ')
+          ..write('segmentCount: $segmentCount, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2103,6 +2387,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AttemptsTable attempts = $AttemptsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $AuditLogsTable auditLogs = $AuditLogsTable(this);
+  late final $LabelRegistryTable labelRegistry = $LabelRegistryTable(this);
   late final Index idxPgSyncKey = Index('idx_pg_sync_key',
       'CREATE INDEX idx_pg_sync_key ON practice_group (profile_id, course_id, lesson_id)');
   late final Index idxPgStatus = Index(
@@ -2126,6 +2411,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         attempts,
         appSettings,
         auditLogs,
+        labelRegistry,
         idxPgSyncKey,
         idxPgStatus,
         idxSrsDue,
@@ -3224,6 +3510,167 @@ typedef $$AuditLogsTableProcessedTableManager = ProcessedTableManager<
     (AuditLog, BaseReferences<_$AppDatabase, $AuditLogsTable, AuditLog>),
     AuditLog,
     PrefetchHooks Function()>;
+typedef $$LabelRegistryTableCreateCompanionBuilder = LabelRegistryCompanion
+    Function({
+  required String audioFingerprint,
+  required String labelPath,
+  required int segmentCount,
+  required int updatedAt,
+  Value<int> rowid,
+});
+typedef $$LabelRegistryTableUpdateCompanionBuilder = LabelRegistryCompanion
+    Function({
+  Value<String> audioFingerprint,
+  Value<String> labelPath,
+  Value<int> segmentCount,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+class $$LabelRegistryTableFilterComposer
+    extends Composer<_$AppDatabase, $LabelRegistryTable> {
+  $$LabelRegistryTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get audioFingerprint => $composableBuilder(
+      column: $table.audioFingerprint,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get labelPath => $composableBuilder(
+      column: $table.labelPath, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get segmentCount => $composableBuilder(
+      column: $table.segmentCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$LabelRegistryTableOrderingComposer
+    extends Composer<_$AppDatabase, $LabelRegistryTable> {
+  $$LabelRegistryTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get audioFingerprint => $composableBuilder(
+      column: $table.audioFingerprint,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get labelPath => $composableBuilder(
+      column: $table.labelPath, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get segmentCount => $composableBuilder(
+      column: $table.segmentCount,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$LabelRegistryTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LabelRegistryTable> {
+  $$LabelRegistryTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get audioFingerprint => $composableBuilder(
+      column: $table.audioFingerprint, builder: (column) => column);
+
+  GeneratedColumn<String> get labelPath =>
+      $composableBuilder(column: $table.labelPath, builder: (column) => column);
+
+  GeneratedColumn<int> get segmentCount => $composableBuilder(
+      column: $table.segmentCount, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LabelRegistryTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $LabelRegistryTable,
+    LabelRegistryData,
+    $$LabelRegistryTableFilterComposer,
+    $$LabelRegistryTableOrderingComposer,
+    $$LabelRegistryTableAnnotationComposer,
+    $$LabelRegistryTableCreateCompanionBuilder,
+    $$LabelRegistryTableUpdateCompanionBuilder,
+    (
+      LabelRegistryData,
+      BaseReferences<_$AppDatabase, $LabelRegistryTable, LabelRegistryData>
+    ),
+    LabelRegistryData,
+    PrefetchHooks Function()> {
+  $$LabelRegistryTableTableManager(_$AppDatabase db, $LabelRegistryTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LabelRegistryTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LabelRegistryTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LabelRegistryTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> audioFingerprint = const Value.absent(),
+            Value<String> labelPath = const Value.absent(),
+            Value<int> segmentCount = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              LabelRegistryCompanion(
+            audioFingerprint: audioFingerprint,
+            labelPath: labelPath,
+            segmentCount: segmentCount,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String audioFingerprint,
+            required String labelPath,
+            required int segmentCount,
+            required int updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              LabelRegistryCompanion.insert(
+            audioFingerprint: audioFingerprint,
+            labelPath: labelPath,
+            segmentCount: segmentCount,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$LabelRegistryTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $LabelRegistryTable,
+    LabelRegistryData,
+    $$LabelRegistryTableFilterComposer,
+    $$LabelRegistryTableOrderingComposer,
+    $$LabelRegistryTableAnnotationComposer,
+    $$LabelRegistryTableCreateCompanionBuilder,
+    $$LabelRegistryTableUpdateCompanionBuilder,
+    (
+      LabelRegistryData,
+      BaseReferences<_$AppDatabase, $LabelRegistryTable, LabelRegistryData>
+    ),
+    LabelRegistryData,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3240,4 +3687,6 @@ class $AppDatabaseManager {
       $$AppSettingsTableTableManager(_db, _db.appSettings);
   $$AuditLogsTableTableManager get auditLogs =>
       $$AuditLogsTableTableManager(_db, _db.auditLogs);
+  $$LabelRegistryTableTableManager get labelRegistry =>
+      $$LabelRegistryTableTableManager(_db, _db.labelRegistry);
 }

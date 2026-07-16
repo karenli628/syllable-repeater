@@ -5,6 +5,7 @@ import 'package:domain/domain.dart' as domain;
 import 'package:drift/drift.dart';
 
 import 'app_database.dart';
+import 'drift_settings_service.dart';
 
 /// ProgressRepository 的 Drift/SQLite adapter；所有批次寫入以 transaction 包住。
 class DriftProgressRepository implements domain.ProgressRepository {
@@ -125,6 +126,8 @@ class DriftProgressRepository implements domain.ProgressRepository {
     final groupRows = await _db.select(_db.practiceGroups).get();
     final stateRows = await _db.select(_db.srsStates).get();
     final attemptRows = await _db.select(_db.attempts).get();
+    final transcriptDisplayModes =
+        await DriftSettingsService.readTranscriptDisplayModes(_db);
     final firstGroup = groupRows.isEmpty ? null : groupRows.first;
     return domain.ProgressSnapshot(
       profileId: firstGroup?.profileId ?? _profileFallback,
@@ -132,6 +135,7 @@ class DriftProgressRepository implements domain.ProgressRepository {
       lessonContentHashes: {
         for (final row in lessonRows) row.id: row.contentHash,
       },
+      transcriptDisplayModes: transcriptDisplayModes,
       groups: groupRows.map(_groupFromRow).toList(growable: false),
       srsStates: stateRows.map(_srsStateFromRow).toList(growable: false),
       attempts: attemptRows.map(_attemptFromRow).toList(growable: false),
@@ -159,6 +163,10 @@ class DriftProgressRepository implements domain.ProgressRepository {
               ),
             );
       }
+      await DriftSettingsService.writeTranscriptDisplayModes(
+        _db,
+        snapshot.transcriptDisplayModes,
+      );
       for (final group in snapshot.groups) {
         await saveGroup(group);
       }
