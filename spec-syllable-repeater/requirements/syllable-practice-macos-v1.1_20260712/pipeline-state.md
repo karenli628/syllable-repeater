@@ -2,15 +2,15 @@
 schema: 1
 project: syllable-repeater
 requirement: syllable-practice-macos-v1.1_20260712
-stage_skill: fullstack-design
-slice: none
+stage_skill: fullstack-code-review
+slice: S10-review-r3-independent
 stage_status: done
-next_skill: task-split
+next_skill: project-archive
 open_tasks: none
-blocked_reason: v1 遺留:AT-09-03 smoke 待使用者親跑、工作樹 29 檔前序變更待裁定
+blocked_reason: none
 next_patrol_due: none
 last_handoff: 交接檔-20260712-01-fullstack-design_v1.1設計定稿_接task-split_中斷USER.md
-last_updated: 2026-07-12
+last_updated: 2026-07-16
 updated_by: claude-code
 
 <!-- 欄位規則(本註解隨檔保留,供人與 check_handoff.py 對照;行數上限不計本註解):

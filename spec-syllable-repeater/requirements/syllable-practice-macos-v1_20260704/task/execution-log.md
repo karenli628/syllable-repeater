@@ -921,6 +921,38 @@
 - **結論**：project archive 與 ops monitoring 已完成；仍建議由 Karen 端對 unsigned zip 執行 Gatekeeper/GUI smoke（AT-09-03 使用者端體驗）。
 - **交付前二次 CI 註記**：archive/ops/knowledge/交接檔全部更新後，嘗試再重跑一次 `bash scripts/ci_core_checks.sh`，但 Codex escalation 自動審核回覆 usage limit 並要求不得 workaround，因此未再繞路執行。最後一次完整 Core CI 全綠發生在 release build/zip 完成後、archive/ops 文件收尾前；文件收尾後僅變更 Markdown/交接/記憶檔。
 
+## Task S6-22（REQ-01→08 真 App smoke 修繕）— 2026-07-12
+
+### 首頁／檔案管理／匯出／錄音／進度格式
+- **狀態**：Done（S6-22.1～S6-22.6 全數完成）
+- **使用者回報與拍板**：
+  - 匯出視窗預設全選，需一鍵全部取消；選定位置後未看到 MP3。
+  - 真機錄音看似啟動但無法確認收音，也沒有播放錄音入口。
+  - `.aboprogress` 用途與 `.abopack` 關係不清楚。
+  - 課件庫改為啟動首頁；首頁左側開啟課件、右側文字資訊窗格；設定區集中儲存課件與進度備份。
+- **實作**：
+  - `AppShellSelectedIndex` 預設改為 library；`LibraryScreen` 新增左開啟／右資訊同列首頁區，保留 due list 與 lesson cards。
+  - `ProgressSettingsScreen` 新增檔案管理，承接 manual translation＋儲存 `.abopack`，並與 `.aboprogress` 匯入/匯出並列。
+  - `PracticeExportDialog` 新增全部選取／全部取消與選取數；`PracticeExporter` 原子寫入後再檢查目的檔存在。
+  - `RecordPracticeRecorder.stop` 等待 macOS WAV 完整可解碼；失敗刪來源檔；成功後 controller 僅保留目前步驟 PCM，`PracticePlayer.playPcm` 使用一次性 WAV 試聽並刪除。
+  - `ProgressEngine` 新輸出 ZIP 單 entry `progress.json`，匯入保留預發布純 JSON legacy 相容；M6 merge policy 未改。
+- **規格同步**：`requirement.md` v1.4、`frontend-design.md`、`task-split.md` 已加入 AT-04-07／AT-06-06、首頁與設定檔案管理、ZIP 契約。
+- **已通過驗證**：
+  - `flutter analyze` ✅ No issues。
+  - `flutter test packages/domain/test/progress_import_export_test.dart` ✅ 5/5。
+  - `flutter test packages/infra/test/practice_exporter_test.dart` ✅ 5/5（新增真 FFmpeg case 後，未設 `FFMPEG_PATH` 時會清楚 skip）。
+  - App 相關 target tests ✅ 41/41；錄音增量回歸 ✅ 17/17。
+  - release bundle 內 LGPL FFmpeg 命令實寫 `/private/tmp/syllable-repeater-export-smoke.mp3` ✅ 16,971 bytes。
+  - `flutter run -d macos` 真 App ✅；CGWindow 1100×728，首頁截圖 `/private/tmp/syllable-repeater-flutter-run-home-20260712.png` 非黑畫面，左右區無重疊/裁切。
+- **收尾驗證（2026-07-12）**：
+  - `bash scripts/ci_core_checks.sh` ✅：hard guardrails、handoff/pipeline-state、CT-09、domain 82/82、infra 74/74、app 75/75、`flutter analyze` No issues。
+  - `python3 scripts/fetch_sidecar_artifacts.py --inventory-only`、`--run-prepare-dry-run`、`--run-prepare` ✅。
+  - `flutter build macos --release --no-pub` ✅：`app/build/macos/Build/Products/Release/syllable_repeater_app.app` 634MB；主執行檔 `file` = Mach-O x86_64。
+  - bundle FFmpeg 8.1.2 ✅：`--enable-shared --disable-static --disable-gpl --disable-nonfree --enable-libmp3lame`；`otool -L` 顯示 `@rpath` shared dylib 與 dynamic `libmp3lame.0.dylib`。
+  - bundle demucs.cpp.main ✅：僅連系統 `Accelerate.framework`、`libc++`、`libSystem`。
+  - `FFMPEG_PATH=app/build/macos/Build/Products/Release/syllable_repeater_app.app/Contents/Resources/sidecar/bin/ffmpeg flutter test packages/infra/test/practice_exporter_test.dart` ✅ 6/6，驗證 release bundle FFmpeg 可實寫 MP3。
+  - `python3 scripts/make_release_zip.py --dry-run` 與實跑 ✅：`dist/SyllableRepeater-macos-x86_64-unsigned.zip` 524MB，SHA-256 `949c76cfdaf8b0e72702dabecca777110806aa01c7a27c17cc238f9dc12a383c`；`unzip -l` 核對 zip 內含 sidecar manifest、ffmpeg、whisper、demucs、兩個模型與 cmudict。
+
 ## e2e 驗收紀錄 — S1a Frontend FP2
 
 - **前置**：使用者裝完整 Xcode 15.4 + CocoaPods；`flutter build macos --debug` ✅（首次 pod install 成功，產物：`app/build/macos/Build/Products/Debug/syllable_repeater_app.app`）。

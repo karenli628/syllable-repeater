@@ -328,6 +328,32 @@
   - _Leverage: 介面 11/19_｜_Requirements: REQ-07、REQ-08_
   - 【`[可直接做]`｜Non-scope：key 不做「顯示已存值」（Keychain 單向）｜驗證：AT-07-05、Q9 設定往返】
 
+## 真 App REQ-01→08 驗收修繕（2026-07-12）
+
+- [x] **S6-22.1 課件庫改為啟動首頁，重排開啟課件與資訊窗格**
+  - **File**：`app/lib/shared/navigation.dart`、`app/lib/features/library/library_screen.dart`
+  - **Work**：啟動預設 `AppSection.library`；首頁同一水平左側提供 `.abopack` 開啟，右側顯示標題、檔名、音節數、譯文、更新時間；下方保留到期清單與課件清單。
+  - **驗證**：`app/test/widget_test.dart`、`app/test/progress/progress_ui_test.dart`；`flutter run -d macos` 以 1100×700 真 App 截圖確認無重疊/裁切。
+- [x] **S6-22.2 設定頁集中課件與進度檔案管理**
+  - **File**：`app/lib/features/progress/progress_settings_screen.dart`
+  - **Work**：把手動譯文與「儲存課件」移入設定的檔案管理區，與 `.aboprogress` 匯入/匯出並列；沿用同一 `LessonPackService` / `ProgressService`，不複製業務邏輯。
+  - **驗證**：設定頁儲存課件帶入 manual translation、進度匯入/匯出與 S6 round-trip widget tests 通過。
+- [x] **S6-22.3 AT-04-07 匯出全部選取／取消與實檔存在 gate**
+  - **File**：`app/lib/features/export/export_dialog.dart`、`packages/infra/lib/src/practice/practice_exporter.dart`
+  - **Work**：匯出視窗新增全部選取／全部取消與已選數；Atomic write 後再確認目的檔存在，缺檔映射 `ERR_EXPORT_DEST_UNWRITABLE`。
+  - **驗證**：`app/test/export/export_dialog_test.dart`、`packages/infra/test/practice_exporter_test.dart`；release LGPL FFmpeg 已獨立實寫 16,971-byte MP3，新增 `FFMPEG_PATH` 真 exporter 測試供可用環境執行。
+- [x] **S6-22.4 AT-06-06 macOS 錄音收尾等待與記憶體試聽**
+  - **File**：`app/lib/features/practice/practice_recording.dart`、`practice_controller.dart`、`practice_player.dart`、`widgets/record_panel.dart`
+  - **Work**：stop 後等待 WAV 可完整 decode；失敗刪來源檔；成功 PCM 僅留目前步驟記憶體，新增「播放錄音」，一次性播放 WAV 於播放後刪除，切步/重錄清空。
+  - **驗證**：`practice_recording_test.dart`、`practice_controller_test.dart`、`practice_player_test.dart`、`practice_screen_test.dart`；維持 M10 磁碟不保留錄音。
+- [x] **S6-22.5 `.aboprogress` 對齊 ZIP＋`progress.json` 契約**
+  - **File**：`packages/domain/lib/src/progress/progress_engine.dart`
+  - **Work**：新輸出改為 ZIP 單 entry `progress.json`；匯入先解 ZIP/驗 schema 再交易合併，並保留預發布純 JSON legacy 讀取相容；M6 merge 規則不變。
+  - **驗證**：`packages/domain/test/progress_import_export_test.dart` 5/5 通過，含 entry、敏感資料掃描、updatedAt、contentHash、損毀檔零副作用。
+- [x] **S6-22.6 完整 CI 與 x86_64 release zip 重建**
+  - **Work**：執行 `bash scripts/ci_core_checks.sh` 全綠後，重跑 `flutter build macos --release --no-pub` 與 `python3 scripts/make_release_zip.py`，更新 zip SHA-256，確認新首頁/錄音/匯出修繕已進 release artifact。
+  - **完成註記（2026-07-12）**：`bash scripts/ci_core_checks.sh` ✅（guardrails、handoff、CT-09、domain 82、infra 74、app 75、`flutter analyze` 全綠）；`flutter build macos --release --no-pub` ✅ 產出 x86_64 `syllable_repeater_app.app` 634MB；bundle 內 FFmpeg 8.1.2 為 `--enable-shared --disable-static --disable-gpl --disable-nonfree --enable-libmp3lame`，`otool -L` 顯示 `@rpath` shared dylib 與 dynamic `libmp3lame.0.dylib`；bundle 內 demucs.cpp.main 僅連系統 `Accelerate.framework`、`libc++`、`libSystem`；以 bundle FFmpeg 跑 `practice_exporter_test.dart` ✅ 6/6；`python3 scripts/make_release_zip.py` ✅ 產出 `dist/SyllableRepeater-macos-x86_64-unsigned.zip` 524MB，SHA-256 `949c76cfdaf8b0e72702dabecca777110806aa01c7a27c17cc238f9dc12a383c`，`unzip -l` 核對 zip 內含 sidecar manifest、ffmpeg、whisper、demucs、兩個模型與 cmudict。
+
 ---
 
 ## 5. 依賴關係與時序建議（任務級）

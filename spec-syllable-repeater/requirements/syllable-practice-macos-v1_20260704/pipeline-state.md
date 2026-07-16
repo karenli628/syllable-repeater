@@ -2,16 +2,16 @@
 schema: 1
 project: syllable-repeater
 requirement: syllable-practice-macos-v1_20260704
-stage_skill: ops-monitoring
-slice: none
+stage_skill: fullstack-code-implementation
+slice: S6-22-GUI-smoke-remediation
 stage_status: done
-next_skill: none
+next_skill: fullstack-code-review
 open_tasks: none
-blocked_reason: 發版待使用者親自完成:AT-09-03 解壓 zip 跑 REQ-01→08 GUI smoke;版控收尾(工作樹大量檔案未 commit,分批確認後提交)
+blocked_reason: none
 next_patrol_due: 2026-08-11
 last_handoff: 交接檔-20260707-04-fullstack-code-implementation_2.1_SidecarArtifactFetchGate.md
 last_updated: 2026-07-12
-updated_by: claude-code
+updated_by: codex
 
 <!-- 欄位規則(本註解隨檔保留,供人與 check_handoff.py 對照;行數上限不計本註解):
 - 落點:spec-<專案代號>/requirements/<需求目錄>/pipeline-state.md(一個需求一份)。
